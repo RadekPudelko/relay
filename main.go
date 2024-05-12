@@ -1,4 +1,4 @@
-package pcfs
+package main
 
 import (
 	"database/sql"
@@ -22,7 +22,7 @@ import (
 var particleToken string 
 var dbConn *sql.DB
 
-type PostPayload struct {
+type CreateTaskRequest struct {
     SomId  string `json:"som_id"`
     ProductId int `json:"product_id"`
     CloudFunction string `json:"cloud_function"`
@@ -30,7 +30,7 @@ type PostPayload struct {
     DesiredReturnCode *int `json:"desired_return_code,omitempty"`
 }
 
-func (p PostPayload) String() string {
+func (p CreateTaskRequest) String() string {
     str := fmt.Sprintf("som: %s, product %d, function: %s", p.SomId, p.ProductId, p.CloudFunction)
     if p.Argument != nil {
         str += fmt.Sprintf(", argument: %s", *p.Argument)
@@ -41,39 +41,22 @@ func (p PostPayload) String() string {
     return str
 }
 
-func RequestBodyToString(body *PostPayload) string {
-    str := fmt.Sprintf("SomId: %s, ProductId: %d, CloudFunction: %s", (*body).SomId, (*body).ProductId, (*body).CloudFunction)
-    if body.Argument != nil {
-        str += fmt.Sprintf(" Argument: %s", *(*body).Argument)
-    }
-    if body.DesiredReturnCode != nil {
-        str += fmt.Sprintf(" Argument: %d", *(*body).DesiredReturnCode)
-    }
-    return str
-}
-
-func logRequestBody(req *PostPayload) {
-    // fmt.Printf("Request for som %s in product %d to call function %s with args %s, expecting resposne %d\n", 
-    //     req.SomId, req.ProductId, req.CloudFunction, *req.Argument, *req.DesiredReturnCode)
-    fmt.Printf("%+v\n", req)
-}
-
 func backgroundTask() {
-    lastTaskId := 1
+    lastTaskId := 0
     for true {
         // Get ready tasks, starting from the lastTaskId, limited 1 per som 
-        taskIds, err := db.SelectTaskIds(dbConn, int(db.Ready), lastTaskId, 10)
+        taskIds, err := db.SelectTaskIds(dbConn, db.TaskReady, lastTaskId)
         if err != nil {
             log.Fatal("backgroundTask: ", err)
         }
 
         log.Printf("Loading %d ready tasks ids from the dbConn\n", len(taskIds))
         if len(taskIds) == 0 {
+            lastTaskId = 0
+            time.Sleep(2*time.Second)
             continue
         }
         nTasks := len(taskIds)
-        log.Printf("Loaded %d tasks\n", nTasks)
-
         lastTaskId = taskIds[nTasks-1]
 
         for _, taskId := range taskIds {
@@ -84,23 +67,33 @@ func backgroundTask() {
                 continue
             }
             // Consider pinging a som if its been more than n seconds since last check
-            if !task.Som.LastOnline.Valid || time.Since(task.Som.LastOnline.Time) > 600 {
+            if !task.Som.LastOnline.Valid || time.Since(task.Som.LastOnline.Time) > 600 * time.Second {
                 // Only ping a som if we have not pinged in n seconds
-                if task.Som.LastPing.Valid && time.Since(task.Som.LastPing.Time) < 600 {
+                if task.Som.LastPing.Valid && time.Since(task.Som.LastPing.Time) < 600 * time.Second {
                     continue
                 }
                 log.Printf("backgroundTask: pinging som %s\n", task.Som.SomId)
                 online, err := particle.Ping(task.Som.SomId, task.Som.ProductId, particleToken)
+                now := sql.NullTime{Time: time.Now(), Valid: true}
                 if err != nil {
                     log.Println("backgroundTask: ", err)
+                    err = db.UpdateSomOnlineAndPing(dbConn, task.Som.Id, task.Som.LastOnline, now)
+                    if err != nil {
+                        log.Println("backgroundTask: ", err)
+                    }
                     continue
                 }
                 if !online {
                     log.Printf("backgroundTask: som %s is offline\n", task.Som.SomId)
-                    db.UpdateSomOnlineAndPing(dbConn, task.Som.Id, task.Som.LastOnline.Time, time.Now())
+                    err = db.UpdateSomOnlineAndPing(dbConn, task.Som.Id, task.Som.LastOnline, now)
+                    if err != nil {
+                        log.Println("backgroundTask: ", err)
+                    }
                     continue
-                } else {
-                    db.UpdateSomOnlineAndPing(dbConn, task.Som.Id, time.Now(), time.Now())
+                }
+                err = db.UpdateSomOnlineAndPing(dbConn, task.Som.Id, now, now)
+                if err != nil {
+                    log.Println("backgroundTask: ", err)
                 }
             }
 
@@ -112,15 +105,25 @@ func backgroundTask() {
             }
             if task.DesiredReturnCode.Valid && rc != int(task.DesiredReturnCode.Int32) {
                 log.Printf("backgroundTask: task %d, expected return code %d, got %d\n", taskId, task.DesiredReturnCode.Int32, rc)
+                err = db.UpdateTaskStatus(dbConn, taskId, db.TaskFailed)
+                if err != nil {
+                    log.Println("backgroundTask: %w", err)
+                }
+                continue
+            }
+            log.Printf("backgroundTask: task %d, success\n", taskId)
+            err = db.UpdateTaskStatus(dbConn, taskId, db.TaskComplete)
+            if err != nil {
+                log.Println("backgroundTask: %w", err)
                 continue
             }
         }
-		time.Sleep(5000 * time.Millisecond)
+        time.Sleep(2*time.Second)
     }
 }
 
 func runTask(task *db.Task, token string) (bool, error) {
-    if task.Status != db.Ready {
+    if task.Status != db.TaskReady {
         return false, fmt.Errorf("runTask, task should have status ready, has ", task.Status)
     }
     log.Printf("runTask: Task %d, try: %d, running %s for %d in product %d\n", task.Id, task.Tries, task.CloudFunction, task.Som.SomId, task.Som.ProductId)
@@ -132,14 +135,14 @@ func getTaskHandler(w http.ResponseWriter, r *http.Request) {
     taskIdStr := r.PathValue("id")
 
 	if taskIdStr == "" {
-        log.Println("getTaskHandler: Missing task id in url: ", r.URL.Path)
+        log.Println("getTaskHandler: missing task id in url: ", r.URL.Path)
         http.Error(w, "Missing task id", http.StatusBadRequest)
         return
     }
 
     taskId, err := strconv.Atoi(taskIdStr)
     if err != nil {
-        log.Println("getTaskHandler: Invalid task id: ", taskIdStr)
+        log.Println("getTaskHandler: invalid task id: ", taskIdStr)
         http.Error(w, "Invalid task id", http.StatusBadRequest)
         return
     }
@@ -172,7 +175,7 @@ func getTaskHandler(w http.ResponseWriter, r *http.Request) {
     w.Write(jsonData)
 }
 
-// Want to add some sort of id to these logs so that I can know whats going on if there are multiple requests at once
+// TODO: Want to add some sort of id to these logs so that I can know whats going on if there are multiple requests at once
 func createTaskHandler(w http.ResponseWriter, r *http.Request) {
     body, err := io.ReadAll(r.Body)
     if err != nil {
@@ -181,7 +184,7 @@ func createTaskHandler(w http.ResponseWriter, r *http.Request) {
         return
     }
 
-    var req PostPayload
+    var req CreateTaskRequest
     err = json.Unmarshal(body, &req)
     if err != nil {
         log.Println("createTaskHandler: json.Unmarshal:", err)
@@ -213,22 +216,9 @@ func createTaskHandler(w http.ResponseWriter, r *http.Request) {
     }
     log.Printf("createTaskHandler: new task created, id: %d\n", taskId)
 
-    type Response struct {
-        TaskId int `json:"task_id"`
-    }
-
-    resp := Response{taskId}
-    jsonData, err := json.Marshal(resp)
-    if err != nil {
-        log.Println("createTaskHandler: json.Marshal:", err.Error())
-        http.Error(w, err.Error(), http.StatusInternalServerError)
-        return
-    }
-    log.Printf("createTaskHandler: HTTP status code: %d", http.StatusOK)
-
     w.Header().Set("Content-Type", "application/json")
     w.WriteHeader(http.StatusOK)
-    w.Write(jsonData)
+    io.WriteString(w, fmt.Sprintf("%d", taskId))
 }
 
 func getRoot(w http.ResponseWriter, r *http.Request) {

@@ -3,7 +3,6 @@ package db
 import (
 	"database/sql"
 	"fmt"
-    "time"
 )
 
 type Som struct {
@@ -54,7 +53,7 @@ func UpdateSomProductId(db *sql.DB, id int, productId int) error {
 	return nil
 }
 
-func UpdateSomOnlineAndPing(db *sql.DB, id int, onlineTime time.Time, pingTime time.Time) error {
+func UpdateSomOnlineAndPing(db *sql.DB, id int, onlineTime sql.NullTime, pingTime sql.NullTime) error {
 	const update string = `UPDATE soms SET last_online = ?, last_ping = ? WHERE id = ?`
 	stmt, err := db.Prepare(update)
 	if err != nil {
@@ -75,12 +74,12 @@ func UpdateSomOnlineAndPing(db *sql.DB, id int, onlineTime time.Time, pingTime t
 }
 
 func InsertSom(db *sql.DB, somId string, productId int) (int, error) {
-	const insert string = `INSERT INTO soms (som_id, product_id) VALUES (?, ?)`
+	const insert string = `INSERT INTO soms (som_id, product_id, last_online, last_ping) VALUES (?, ?, ?, ?)`
 	stmt, err := db.Prepare(insert)
 	if err != nil {
 		return 0, fmt.Errorf("InsertSom: db.Prepare: %w", err)
 	}
-	result, err := stmt.Exec(somId, productId)
+	result, err := stmt.Exec(somId, productId, nil, nil)
 	if err != nil {
 		return 0, fmt.Errorf("InsertSom: stmt.Exec: %w", err)
 	}

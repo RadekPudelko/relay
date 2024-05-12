@@ -24,9 +24,9 @@ func (t Task) String() string {
 type TaskStatus int
 
 const (
-	Ready    TaskStatus = 0
-	Failed   TaskStatus = 1
-	Complete TaskStatus = 2
+	TaskReady    TaskStatus = 0
+	TaskFailed   TaskStatus = 1
+	TaskComplete TaskStatus = 2
 )
 
 // Example of custom field serialization so that instead of reporting sql.NullFields 
@@ -55,10 +55,10 @@ const (
 // }
 
 func SelectTask(db *sql.DB, id int) (*Task, error) {
-	const sel string = `SELECT * FROM tasks WHERE id = ?`
-	stmt, err := db.Prepare(sel)
+	const query string = `SELECT * FROM tasks WHERE id = ?`
+	stmt, err := db.Prepare(query)
 	if err != nil {
-		return nil, fmt.Errorf("SelTask: db.Prepare: %w", err)
+		return nil, fmt.Errorf("SelectTask: db.Prepare: %w", err)
 	}
 	defer stmt.Close()
 	// TODO: Apply this approach to other single row reads
@@ -72,70 +72,112 @@ func SelectTask(db *sql.DB, id int) (*Task, error) {
 		if err == sql.ErrNoRows {
 			return nil, nil
 		}
-		return nil, fmt.Errorf("SelTask: row.Scan: %w", err)
+		return nil, fmt.Errorf("SelectTask: row.Scan: %w", err)
 	}
 
 	task.Som, err = SelectSomByKey(db, somKey)
 	if err != nil {
-		return nil, fmt.Errorf("SelTask: %w", err)
+		return nil, fmt.Errorf("SelectTask: %w", err)
 	}
 	return &task, nil
 }
 
-func SelectTaskIds(db *sql.DB, status, id, limit int) ([]int, error) {
-	const sel string = `
+func SelectTaskIds(db *sql.DB, status TaskStatus, id int) ([]int, error) {
+	const query string = `
         SELECT MIN(id) AS id 
         FROM tasks
         WHERE status = ?
-        AND id >= ?
+        AND id > ?
         ORDER BY id ASC
-        LIMIT ?
         `
-	stmt, err := db.Prepare(sel)
+	stmt, err := db.Prepare(query)
 	if err != nil {
-		return nil, fmt.Errorf("TaskIds: db.Prepare: %w", err)
+		return nil, fmt.Errorf("SelectTaskIds: db.Prepare: %w", err)
 	}
 	defer stmt.Close()
-	rows, err := stmt.Query(status, id, limit)
+	rows, err := stmt.Query(status, id)
 	// Might have no rows, where does that error pop?
 	if err != nil {
-		return nil, fmt.Errorf("TaskIds: stmt.Query: %w", err)
+		return nil, fmt.Errorf("SelectTaskIds: stmt.Query: %w", err)
 	}
 	defer rows.Close()
 
 	var taskIds []int
+    if !rows.Next() {
+        return taskIds, nil
+    }
+
+    // SELECT MIN will return a null row if there aren't any tasks instead of 0 rows
+    var taskId sql.NullInt32
+    if err := rows.Scan(&taskId); err != nil {
+        return nil, fmt.Errorf("SelectTaskIds: first row stmt.Query: %w", err)
+    }
+    // First row is NULL, so there are no tasks
+    if !taskId.Valid {
+        return taskIds, nil
+    }
+
+    // There are tasks
+    taskIds = append(taskIds, int(taskId.Int32))
 	for rows.Next() {
 		var taskId int
 		if err := rows.Scan(&taskId); err != nil {
-			return nil, fmt.Errorf("TaskIds: rows.Scan: %w", err)
+			return nil, fmt.Errorf("SelectTaskIds: rows.Scan: %w", err)
 		}
 		taskIds = append(taskIds, taskId)
 	}
 	// Is this necessary?
 	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("TaskIds: rows.Err: %w", err)
+		return nil, fmt.Errorf("SelectTaskIds: rows.Err: %w", err)
 	}
 	return taskIds, nil
 }
 
 func InsertTask(db *sql.DB, somKey int, cloudFunction string, argument *string, desiredReturnCode *int) (int, error) {
-	const insert string = `
+	const query string = `
         INSERT INTO tasks 
         (som_key, cloud_function, argument, desired_return_code, status, tries) 
         VALUES (?, ?, ?, ?, ?, ?)
         `
-	stmt, err := db.Prepare(insert)
+	stmt, err := db.Prepare(query)
 	if err != nil {
-		return 0, fmt.Errorf("InsTask: db.Prepare: %w", err)
+		return 0, fmt.Errorf("InsertTask: db.Prepare: %w", err)
 	}
-	result, err := stmt.Exec(somKey, cloudFunction, argument, desiredReturnCode, Ready, 0)
+	result, err := stmt.Exec(somKey, cloudFunction, argument, desiredReturnCode, TaskReady, 0)
 	if err != nil {
-		return 0, fmt.Errorf("InsTask: stmt.Exec: %w", err)
+		return 0, fmt.Errorf("InsertTask: stmt.Exec: %w", err)
 	}
 	id, err := result.LastInsertId()
 	if err != nil {
-		return 0, fmt.Errorf("InsTask: result.LastInsertIdId: %w", err)
+		return 0, fmt.Errorf("InsertTask: result.LastInsertIdId: %w", err)
 	}
 	return int(id), nil
+}
+
+func UpdateTaskStatus(db *sql.DB, taskId int, status TaskStatus) (error) {
+	const query string = `
+        UPDATE tasks 
+        SET status = ?
+        WHERE id = ?
+        `
+	stmt, err := db.Prepare(query)
+	if err != nil {
+		return fmt.Errorf("UpdateTask: db.Prepare: %w", err)
+	}
+	result, err := stmt.Exec(status, taskId) 
+	if err != nil {
+		return fmt.Errorf("UpdateTask: stmt.Exec: %w", err)
+	}
+
+    // Is this necessary?
+    rows, err := result.RowsAffected()
+    if err != nil {
+        fmt.Println("Error getting rows affected:", err)
+		return fmt.Errorf("UpdateTask: result.RowsAffected: %w", err)
+    }
+    if rows != 1 {
+		return fmt.Errorf("UpdateTask: expected update to affect 1 row, affected %d rows", rows)
+    }
+	return nil
 }
 
