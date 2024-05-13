@@ -41,11 +41,9 @@ func CreateTasksTable(db *sql.DB) error {
         som_key INTEGER NOT NULL,
         cloud_function TEXT NOT NULL,
         argument TEXT,
-        desired_return_code INTEGER,
+        desired_return_code INTEGER NULL,
         status INTEGER NOT NULL,
         tries INTEGER NOT NULL,
-        response_code INTEGER,
-        response_text TEXT,
         FOREIGN KEY(som_key) REFERENCES soms(id)
         )`
 	_, err := db.Exec(create)

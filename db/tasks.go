@@ -13,8 +13,6 @@ type Task struct {
 	DesiredReturnCode sql.NullInt32  `json:"desired_return_code"`
 	Status            TaskStatus     `json:"status"`
 	Tries             int            `json:"tries"`
-	ResponseCode      sql.NullInt16  `json:"resposne_code"`
-	ResponseText      sql.NullString `json:"response_text"`
 }
 
 func (t Task) String() string {
@@ -66,8 +64,7 @@ func SelectTask(db *sql.DB, id int) (*Task, error) {
 	var task Task
 	var somKey int
 	err = row.Scan(&task.Id, &somKey, &task.CloudFunction,
-		&task.Argument, &task.DesiredReturnCode, &task.Status, &task.Tries,
-		&task.ResponseCode, &task.ResponseText)
+		&task.Argument, &task.DesiredReturnCode, &task.Status, &task.Tries)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return nil, nil
@@ -154,17 +151,17 @@ func InsertTask(db *sql.DB, somKey int, cloudFunction string, argument *string, 
 	return int(id), nil
 }
 
-func UpdateTaskStatus(db *sql.DB, taskId int, status TaskStatus) (error) {
+func UpdateTask(db *sql.DB, taskId int, status TaskStatus, tries int) (error) {
 	const query string = `
         UPDATE tasks 
-        SET status = ?
+        SET status = ?, tries = ?
         WHERE id = ?
         `
 	stmt, err := db.Prepare(query)
 	if err != nil {
 		return fmt.Errorf("UpdateTask: db.Prepare: %w", err)
 	}
-	result, err := stmt.Exec(status, taskId) 
+	result, err := stmt.Exec(status, tries, taskId) 
 	if err != nil {
 		return fmt.Errorf("UpdateTask: stmt.Exec: %w", err)
 	}

@@ -1,6 +1,7 @@
 package particle
 
 import (
+	"database/sql"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -9,6 +10,8 @@ import (
 )
 
 // https://docs.particle.io/reference/cloud-apis/api/#errors
+// 408 is not actually used?
+
 func Ping(somId string, productId int, token string) (bool, error) {
     queryParams := url.Values{}
     queryParams.Set("access_token", token)
@@ -35,7 +38,6 @@ func Ping(somId string, productId int, token string) (bool, error) {
 	}
 
     // TODO: handle device offline error code as none error
-    // TODO: According to particle a 408 should be returned on timeout
     if resp.StatusCode != 200 {
         // This isnt really any error
         return false, fmt.Errorf("particle.Ping: status code: %d, response body: %s", resp.StatusCode, string(body))
@@ -54,7 +56,7 @@ func Ping(somId string, productId int, token string) (bool, error) {
     return response.Online, nil
 }
 
-func CloudFunction(somId string, productId int, cloudFunction string, argument string, token string) (int, error) {
+func CloudFunction(somId string, productId int, cloudFunction string, argument string, token string, returnValue sql.NullInt32) (bool, error) {
     params := url.Values{}
     params.Add("access_token", token)
     params.Add("arg", argument)
@@ -65,18 +67,19 @@ func CloudFunction(somId string, productId int, cloudFunction string, argument s
     // This can block for a long time
     resp, err := http.PostForm(url, params)
     if err != nil {
-        return 0, fmt.Errorf("particle.CloudFunction: http.NewRequest: %w", err)
+        return false, fmt.Errorf("particle.CloudFunction: http.NewRequest: %w", err)
     }
 	defer resp.Body.Close()
 
     body, err := io.ReadAll(resp.Body)
 	if err != nil {
-        return 0, fmt.Errorf("particle.CloudFunction: io.ReadAll: %w, body %s", err, body)
+        return false, fmt.Errorf("particle.CloudFunction: io.ReadAll: %w,  body %s", err, body)
 	}
 
     // TODO: Find a way to treat this differently?
     if resp.StatusCode != 200 {
-        return 0, fmt.Errorf("particle.CloudFunction: status code: %d, response body: %s", resp.StatusCode, string(body))
+        // time out response status code: 400, response body: {"ok":false,"error":"Timed out."}
+        return false, fmt.Errorf("particle.CloudFunction: status code: %d, response body: %s", resp.StatusCode, string(body))
     }
 
     type ResponseData struct {
@@ -86,12 +89,14 @@ func CloudFunction(somId string, productId int, cloudFunction string, argument s
         ReturnValue int `json:"return_value"`
     }
     var data ResponseData
-
     err = json.Unmarshal(body, &data)
     if err != nil {
-        return 0, fmt.Errorf("particle.Ping: json.Unmarshal: %w, body %s", err, body)
+        return false, fmt.Errorf("particle.Ping: json.Unmarshal: %w, body %s", err, body)
     }
 
-    return data.ReturnValue, nil
+    if returnValue.Valid {
+        return data.ReturnValue == int(returnValue.Int32), nil
+    }
+    return true, nil
 }
 

@@ -98,21 +98,28 @@ func backgroundTask() {
             }
 
             log.Printf("backgroundTask: som %s is online\n", task.Som.SomId)
-            rc, err := particle.CloudFunction(task.Som.SomId, task.Som.ProductId, task.CloudFunction, task.Argument, particleToken)
+            // TODO: may want to get return value from function
+            // TODO: may want to add some way to store error history in the database
+            success, err := particle.CloudFunction(task.Som.SomId, task.Som.ProductId, task.CloudFunction, task.Argument, particleToken, task.DesiredReturnCode)
             if err != nil {
                 log.Println("backgroundTask: %w", err)
-                continue
-            }
-            if task.DesiredReturnCode.Valid && rc != int(task.DesiredReturnCode.Int32) {
-                log.Printf("backgroundTask: task %d, expected return code %d, got %d\n", taskId, task.DesiredReturnCode.Int32, rc)
-                err = db.UpdateTaskStatus(dbConn, taskId, db.TaskFailed)
+                if task.Tries == 2 { // Task is considered failed on third attempt
+                    err = db.UpdateTask(dbConn, taskId, db.TaskFailed, task.Tries+1)
+                } else {
+                    err = db.UpdateTask(dbConn, taskId, db.TaskReady, task.Tries+1)
+                }
                 if err != nil {
                     log.Println("backgroundTask: %w", err)
                 }
                 continue
             }
-            log.Printf("backgroundTask: task %d, success\n", taskId)
-            err = db.UpdateTaskStatus(dbConn, taskId, db.TaskComplete)
+            if !success {
+                log.Printf("backgroundTask: task %d, failed\n", taskId)
+                err = db.UpdateTask(dbConn, taskId, db.TaskFailed, task.Tries+1)
+            } else {
+                log.Printf("backgroundTask: task %d, success\n", taskId)
+                err = db.UpdateTask(dbConn, taskId, db.TaskComplete, task.Tries+1)
+            }
             if err != nil {
                 log.Println("backgroundTask: %w", err)
                 continue
@@ -120,15 +127,6 @@ func backgroundTask() {
         }
         time.Sleep(2*time.Second)
     }
-}
-
-func runTask(task *db.Task, token string) (bool, error) {
-    if task.Status != db.TaskReady {
-        return false, fmt.Errorf("runTask, task should have status ready, has ", task.Status)
-    }
-    log.Printf("runTask: Task %d, try: %d, running %s for %d in product %d\n", task.Id, task.Tries, task.CloudFunction, task.Som.SomId, task.Som.ProductId)
-
-    return false, nil
 }
 
 func getTaskHandler(w http.ResponseWriter, r *http.Request) {
