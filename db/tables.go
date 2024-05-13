@@ -40,8 +40,9 @@ func CreateTasksTable(db *sql.DB) error {
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         som_key INTEGER NOT NULL,
         cloud_function TEXT NOT NULL,
-        argument TEXT,
+        argument TEXT NOT NULL,
         desired_return_code INTEGER NULL,
+        scheduled_time DATETIME NOT NULL,
         status INTEGER NOT NULL,
         tries INTEGER NOT NULL,
         FOREIGN KEY(som_key) REFERENCES soms(id)

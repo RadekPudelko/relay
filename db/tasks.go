@@ -3,6 +3,7 @@ package db
 import (
 	"database/sql"
 	"fmt"
+    "time"
 )
 
 type Task struct {
@@ -11,6 +12,7 @@ type Task struct {
 	CloudFunction     string         `json:"cloud_function"`
 	Argument          string         `json:"argument"`
 	DesiredReturnCode sql.NullInt32  `json:"desired_return_code"`
+    ScheduledTime time.Time `json:"scheduled_time"`
 	Status            TaskStatus     `json:"status"`
 	Tries             int            `json:"tries"`
 }
@@ -20,7 +22,6 @@ func (t Task) String() string {
 }
 
 type TaskStatus int
-
 const (
 	TaskReady    TaskStatus = 0
 	TaskFailed   TaskStatus = 1
@@ -63,8 +64,8 @@ func SelectTask(db *sql.DB, id int) (*Task, error) {
 	row := stmt.QueryRow(id)
 	var task Task
 	var somKey int
-	err = row.Scan(&task.Id, &somKey, &task.CloudFunction,
-		&task.Argument, &task.DesiredReturnCode, &task.Status, &task.Tries)
+	err = row.Scan(&task.Id, &somKey, &task.CloudFunction, &task.Argument, 
+        &task.DesiredReturnCode, &task.ScheduledTime, &task.Status, &task.Tries)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return nil, nil
@@ -72,27 +73,29 @@ func SelectTask(db *sql.DB, id int) (*Task, error) {
 		return nil, fmt.Errorf("SelectTask: row.Scan: %w", err)
 	}
 
-	task.Som, err = SelectSomByKey(db, somKey)
+	task.Som, err = SelectSom(db, somKey)
 	if err != nil {
 		return nil, fmt.Errorf("SelectTask: %w", err)
 	}
 	return &task, nil
 }
 
-func SelectTaskIds(db *sql.DB, status TaskStatus, id int) ([]int, error) {
+func SelectTaskIds(db *sql.DB, status TaskStatus, id int, scheduledTime time.Time, limit int) ([]int, error) {
 	const query string = `
         SELECT MIN(id) AS id 
         FROM tasks
         WHERE status = ?
         AND id > ?
+        AND scheduled_time < ?
         ORDER BY id ASC
+        LIMIT ?
         `
 	stmt, err := db.Prepare(query)
 	if err != nil {
 		return nil, fmt.Errorf("SelectTaskIds: db.Prepare: %w", err)
 	}
 	defer stmt.Close()
-	rows, err := stmt.Query(status, id)
+	rows, err := stmt.Query(status, id, scheduledTime, limit)
 	// Might have no rows, where does that error pop?
 	if err != nil {
 		return nil, fmt.Errorf("SelectTaskIds: stmt.Query: %w", err)
@@ -130,17 +133,17 @@ func SelectTaskIds(db *sql.DB, status TaskStatus, id int) ([]int, error) {
 	return taskIds, nil
 }
 
-func InsertTask(db *sql.DB, somKey int, cloudFunction string, argument *string, desiredReturnCode *int) (int, error) {
+func InsertTask(db *sql.DB, somKey int, cloudFunction string, argument string, desiredReturnCode *int, scheduledTime time.Time) (int, error) {
 	const query string = `
         INSERT INTO tasks 
-        (som_key, cloud_function, argument, desired_return_code, status, tries) 
-        VALUES (?, ?, ?, ?, ?, ?)
+        (som_key, cloud_function, argument, desired_return_code, scheduled_time, status, tries) 
+        VALUES (?, ?, ?, ?, ?, ?, ?)
         `
 	stmt, err := db.Prepare(query)
 	if err != nil {
 		return 0, fmt.Errorf("InsertTask: db.Prepare: %w", err)
 	}
-	result, err := stmt.Exec(somKey, cloudFunction, argument, desiredReturnCode, TaskReady, 0)
+	result, err := stmt.Exec(somKey, cloudFunction, argument, desiredReturnCode, scheduledTime, TaskReady, 0)
 	if err != nil {
 		return 0, fmt.Errorf("InsertTask: stmt.Exec: %w", err)
 	}
@@ -151,17 +154,17 @@ func InsertTask(db *sql.DB, somKey int, cloudFunction string, argument *string, 
 	return int(id), nil
 }
 
-func UpdateTask(db *sql.DB, taskId int, status TaskStatus, tries int) (error) {
+func UpdateTask(db *sql.DB, taskId int, scheduledTime time.Time, status TaskStatus, tries int, ) (error) {
 	const query string = `
         UPDATE tasks 
-        SET status = ?, tries = ?
+        SET status = ?, tries = ?, scheduled_time = ?
         WHERE id = ?
         `
 	stmt, err := db.Prepare(query)
 	if err != nil {
 		return fmt.Errorf("UpdateTask: db.Prepare: %w", err)
 	}
-	result, err := stmt.Exec(status, tries, taskId) 
+	result, err := stmt.Exec(status, tries, scheduledTime, taskId) 
 	if err != nil {
 		return fmt.Errorf("UpdateTask: stmt.Exec: %w", err)
 	}

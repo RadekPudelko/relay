@@ -13,6 +13,29 @@ type Som struct {
 	LastPing   sql.NullTime `json:"last_ping"`
 }
 
+func SelectSom(db *sql.DB, key int) (*Som, error) {
+	const sel string = `SELECT * FROM soms WHERE id = ?`
+	stmt, err := db.Prepare(sel)
+	if err != nil {
+		return nil, fmt.Errorf("SelectSom: db.Prepare: %w", err)
+	}
+	defer stmt.Close()
+
+	row, err := stmt.Query(key)
+	// Might have no rows, where does that error pop?
+	if err != nil {
+		return nil, fmt.Errorf("SelectSom: stmt.Query: %w", err)
+	}
+	defer row.Close()
+
+	var som Som
+	err = stmt.QueryRow(key).Scan(&som.Id, &som.SomId, &som.ProductId, &som.LastOnline, &som.LastPing)
+	if err != nil {
+		return nil, fmt.Errorf("SelectSom: stmt.QueryRow: %w", err)
+	}
+	return &som, nil
+}
+
 func SelectSomBySomId(db *sql.DB, somId string) (*Som, error) {
 	const sel string = `SELECT * FROM soms WHERE som_id = ?`
 	stmt, err := db.Prepare(sel)
@@ -33,42 +56,26 @@ func SelectSomBySomId(db *sql.DB, somId string) (*Som, error) {
 	return &som, nil
 }
 
-func UpdateSomProductId(db *sql.DB, id int, productId int) error {
-	const update string = `UPDATE soms SET product_id = ? WHERE id = ?`
+func UpdateSom(db *sql.DB, id int, product int, onlineTime, pingTime sql.NullTime) error {
+	const update string = `
+        UPDATE soms 
+        SET product_id = ?, last_online = ?, last_ping = ? 
+        WHERE id = ?
+    `
 	stmt, err := db.Prepare(update)
 	if err != nil {
-		return fmt.Errorf("UpdateSomProductId: db.Prepare: %w", err)
+		return fmt.Errorf("UpdateSom: db.Prepare: %w", err)
 	}
-	result, err := stmt.Exec(productId, id)
+	result, err := stmt.Exec(product, onlineTime, pingTime, id)
 	if err != nil {
-		return fmt.Errorf("UpdateSomProductId: stmt.Exec: %w", err)
+		return fmt.Errorf("UpdateSom: stmt.Exec: %w", err)
 	}
 	rowsAffected, err := result.RowsAffected()
 	if err != nil {
-		return fmt.Errorf("UpdateSomProductId: result.rowsAffected: %w", err)
+		return fmt.Errorf("UpdateSom: result.rowsAffected: %w", err)
 	}
 	if rowsAffected != 1 {
-		return fmt.Errorf("UpdateSomProductId: expected to affect 1 row, affected %d", rowsAffected)
-	}
-	return nil
-}
-
-func UpdateSomOnlineAndPing(db *sql.DB, id int, onlineTime sql.NullTime, pingTime sql.NullTime) error {
-	const update string = `UPDATE soms SET last_online = ?, last_ping = ? WHERE id = ?`
-	stmt, err := db.Prepare(update)
-	if err != nil {
-		return fmt.Errorf("UpdateSomOnlineAndPing: db.Prepare: %w", err)
-	}
-	result, err := stmt.Exec(onlineTime, pingTime, id)
-	if err != nil {
-		return fmt.Errorf("UpdateSomOnlineAndPing: stmt.Exec: %w", err)
-	}
-	rowsAffected, err := result.RowsAffected()
-	if err != nil {
-		return fmt.Errorf("UpdateSomOnlineAndPing: result.rowsAffected: %w", err)
-	}
-	if rowsAffected != 1 {
-		return fmt.Errorf("UpdateSomOnlineAndPing: expected to affect 1 row, affected %d", rowsAffected)
+		return fmt.Errorf("UpdateSom: expected to affect 1 row, affected %d", rowsAffected)
 	}
 	return nil
 }
@@ -103,34 +110,11 @@ func InsertOrUpdateSom(db *sql.DB, somId string, productId int) (int, error) {
 		if som.ProductId == productId {
 			return som.Id, nil
 		}
-		err = UpdateSomProductId(db, som.Id, productId)
+		err = UpdateSom(db, som.Id, productId, som.LastOnline, som.LastPing)
 		if err != nil {
 			return som.Id, fmt.Errorf("InsertOrUpdateSom: %w", err)
 		}
 	}
 	return InsertSom(db, somId, productId)
-}
-
-func SelectSomByKey(db *sql.DB, key int) (*Som, error) {
-	const sel string = `SELECT * FROM soms WHERE id = ?`
-	stmt, err := db.Prepare(sel)
-	if err != nil {
-		return nil, fmt.Errorf("SelectSomByKey: db.Prepare: %w", err)
-	}
-	defer stmt.Close()
-
-	row, err := stmt.Query(key)
-	// Might have no rows, where does that error pop?
-	if err != nil {
-		return nil, fmt.Errorf("SelectSomByKey: stmt.Query: %w", err)
-	}
-	defer row.Close()
-
-	var som Som
-	err = stmt.QueryRow(key).Scan(&som.Id, &som.SomId, &som.ProductId, &som.LastOnline, &som.LastPing)
-	if err != nil {
-		return nil, fmt.Errorf("SelectSomByKey: stmt.QueryRow: %w", err)
-	}
-	return &som, nil
 }
 

@@ -28,6 +28,7 @@ type CreateTaskRequest struct {
     CloudFunction string `json:"cloud_function"`
     Argument *string `json:"argument,omitempty"`
     DesiredReturnCode *int `json:"desired_return_code,omitempty"`
+    ScheduledTime *time.Time `json:"scheduled_time,omitempty"`
 }
 
 func (p CreateTaskRequest) String() string {
@@ -45,7 +46,9 @@ func backgroundTask() {
     lastTaskId := 0
     for true {
         // Get ready tasks, starting from the lastTaskId, limited 1 per som 
-        taskIds, err := db.SelectTaskIds(dbConn, db.TaskReady, lastTaskId)
+        // This implementation does not care about the order of tasks
+        // To take into account order, would first need to get list of soms with ready tasks, then query the min for each
+        taskIds, err := db.SelectTaskIds(dbConn, db.TaskReady, lastTaskId, time.Now(), 10)
         if err != nil {
             log.Fatal("backgroundTask: ", err)
         }
@@ -60,24 +63,24 @@ func backgroundTask() {
         lastTaskId = taskIds[nTasks-1]
 
         for _, taskId := range taskIds {
-            log.Printf("backgroundTask: running task %d\n", taskId)
             task, err := db.SelectTask(dbConn, taskId)
             if err != nil {
-                log.Println("backgroundTask: ", err)
+                log.Println("backgroundTask:", err)
                 continue
             }
             // Consider pinging a som if its been more than n seconds since last check
-            if !task.Som.LastOnline.Valid || time.Since(task.Som.LastOnline.Time) > 600 * time.Second {
+            if !task.Som.LastOnline.Valid || time.Since(task.Som.LastOnline.Time) > 5 * time.Minute {
                 // Only ping a som if we have not pinged in n seconds
-                if task.Som.LastPing.Valid && time.Since(task.Som.LastPing.Time) < 600 * time.Second {
+                if task.Som.LastPing.Valid && time.Since(task.Som.LastPing.Time) < 5 * time.Minute {
+                    log.Printf("backgroundTask: skipping task %d, som %s is not online\n", taskId, task.Som.SomId)
                     continue
                 }
                 log.Printf("backgroundTask: pinging som %s\n", task.Som.SomId)
                 online, err := particle.Ping(task.Som.SomId, task.Som.ProductId, particleToken)
                 now := sql.NullTime{Time: time.Now(), Valid: true}
                 if err != nil {
-                    log.Println("backgroundTask: ", err)
-                    err = db.UpdateSomOnlineAndPing(dbConn, task.Som.Id, task.Som.LastOnline, now)
+                    log.Println("backgroundTask:", err)
+                    err = db.UpdateSom(dbConn, task.Som.Id, task.Som.ProductId, task.Som.LastOnline, now)
                     if err != nil {
                         log.Println("backgroundTask: ", err)
                     }
@@ -85,43 +88,46 @@ func backgroundTask() {
                 }
                 if !online {
                     log.Printf("backgroundTask: som %s is offline\n", task.Som.SomId)
-                    err = db.UpdateSomOnlineAndPing(dbConn, task.Som.Id, task.Som.LastOnline, now)
+                    err = db.UpdateSom(dbConn, task.Som.Id, task.Som.ProductId, task.Som.LastOnline, now)
                     if err != nil {
                         log.Println("backgroundTask: ", err)
                     }
                     continue
                 }
-                err = db.UpdateSomOnlineAndPing(dbConn, task.Som.Id, now, now)
+                err = db.UpdateSom(dbConn, task.Som.Id, task.Som.ProductId, now, now)
                 if err != nil {
-                    log.Println("backgroundTask: ", err)
+                    log.Println("backgroundTask:", err)
                 }
             }
 
+            log.Printf("backgroundTask: runnning task %d\n", taskId)
             log.Printf("backgroundTask: som %s is online\n", task.Som.SomId)
             // TODO: may want to get return value from function
             // TODO: may want to add some way to store error history in the database
             success, err := particle.CloudFunction(task.Som.SomId, task.Som.ProductId, task.CloudFunction, task.Argument, particleToken, task.DesiredReturnCode)
+            fiveMinLater := time.Now().Add(5 * time.Minute)
             if err != nil {
-                log.Println("backgroundTask: %w", err)
+                log.Println("backgroundTask:", err)
                 if task.Tries == 2 { // Task is considered failed on third attempt
-                    err = db.UpdateTask(dbConn, taskId, db.TaskFailed, task.Tries+1)
+                    log.Printf("backgroundTask task %d has failed due to exceeding max tries, err %v:\n", taskId, err)
+                    err = db.UpdateTask(dbConn, taskId, task.ScheduledTime, db.TaskFailed, task.Tries+1)
                 } else {
-                    err = db.UpdateTask(dbConn, taskId, db.TaskReady, task.Tries+1)
+                    err = db.UpdateTask(dbConn, taskId, fiveMinLater, db.TaskReady, task.Tries+1)
                 }
                 if err != nil {
-                    log.Println("backgroundTask: %w", err)
+                    log.Println("backgroundTask:", err)
                 }
                 continue
             }
             if !success {
-                log.Printf("backgroundTask: task %d, failed\n", taskId)
-                err = db.UpdateTask(dbConn, taskId, db.TaskFailed, task.Tries+1)
+                log.Printf("backgroundTask task %d has failed due to mismatch in returned code\n", taskId)
+                err = db.UpdateTask(dbConn, taskId, task.ScheduledTime, db.TaskFailed, task.Tries+1)
             } else {
                 log.Printf("backgroundTask: task %d, success\n", taskId)
-                err = db.UpdateTask(dbConn, taskId, db.TaskComplete, task.Tries+1)
+                err = db.UpdateTask(dbConn, taskId, task.ScheduledTime, db.TaskComplete, task.Tries+1)
             }
             if err != nil {
-                log.Println("backgroundTask: %w", err)
+                log.Println("backgroundTask:", err)
                 continue
             }
         }
@@ -206,13 +212,23 @@ func createTaskHandler(w http.ResponseWriter, r *http.Request) {
         return
     }
 
-    taskId, err := db.InsertTask(dbConn, somKey, req.CloudFunction, req.Argument, req.DesiredReturnCode)
+    // TODO: validate the scheduled time
+    scheduledTime := time.Now()
+    if req.ScheduledTime != nil {
+        scheduledTime = *req.ScheduledTime
+    }
+    argument := ""
+    if req.Argument != nil {
+        argument = *req.Argument
+    }
+
+    taskId, err := db.InsertTask(dbConn, somKey, req.CloudFunction, argument, req.DesiredReturnCode, scheduledTime)
     if err != nil {
         log.Println("createTaskHandler:", err.Error())
         http.Error(w, err.Error(), http.StatusInternalServerError)
         return
     }
-    log.Printf("createTaskHandler: new task created, id: %d\n", taskId)
+    log.Printf("createTaskHandler: new task created, id: %d scheduled for %s\n", taskId, scheduledTime.String())
 
     w.Header().Set("Content-Type", "application/json")
     w.WriteHeader(http.StatusOK)
