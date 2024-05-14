@@ -82,7 +82,7 @@ func SelectTask(db *sql.DB, id int) (*Task, error) {
 
 func SelectTaskIds(db *sql.DB, status TaskStatus, id int, scheduledTime time.Time, limit int) ([]int, error) {
 	const query string = `
-        SELECT MIN(id) AS id 
+        SELECT MIN(id) AS id
         FROM tasks
         WHERE status = ?
         AND id > ?
