@@ -80,22 +80,33 @@ func SelectTask(db *sql.DB, id int) (*Task, error) {
 	return &task, nil
 }
 
-func SelectTaskIds(db *sql.DB, status TaskStatus, id int, scheduledTime time.Time, limit int) ([]int, error) {
-	const query string = `
-        SELECT MIN(id) AS id
-        FROM tasks
-        WHERE status = ?
-        AND id > ?
-        AND scheduled_time < ?
-        ORDER BY id ASC
-        LIMIT ?
-        `
+func SelectTaskIds(db *sql.DB, status TaskStatus, startId, endId, limit *int, scheduledTime time.Time) ([]int, error) {
+    params := []interface{}{status}
+    query := `SELECT MIN(id) AS id FROM tasks WHERE status = ?`
+    if startId != nil {
+        query += ` AND id >= ?`
+        params = append(params, startId)
+    }
+    if endId != nil {
+        query += ` AND id <= ?`
+        params = append(params, endId)
+    }
+    query += ` AND scheduled_time < ? ORDER BY id ASC`
+    params = append(params, scheduledTime)
+    if limit != nil {
+        query += ` LIMIT ?`
+        params = append(params, limit)
+    }
+    fmt.Println(query)
+    fmt.Println(params)
+
 	stmt, err := db.Prepare(query)
 	if err != nil {
 		return nil, fmt.Errorf("SelectTaskIds: db.Prepare: %w", err)
 	}
 	defer stmt.Close()
-	rows, err := stmt.Query(status, id, scheduledTime, limit)
+
+	rows, err := stmt.Query(params...)
 	// Might have no rows, where does that error pop?
 	if err != nil {
 		return nil, fmt.Errorf("SelectTaskIds: stmt.Query: %w", err)
@@ -133,7 +144,7 @@ func SelectTaskIds(db *sql.DB, status TaskStatus, id int, scheduledTime time.Tim
 	return taskIds, nil
 }
 
-func InsertTask(db *sql.DB, somKey int, cloudFunction string, argument string, desiredReturnCode *int, scheduledTime time.Time) (int, error) {
+func InsertTask(db *sql.DB, somKey int, cloudFunction string, argument string, desiredReturnCode sql.NullInt32, scheduledTime time.Time) (int, error) {
 	const query string = `
         INSERT INTO tasks 
         (som_key, cloud_function, argument, desired_return_code, scheduled_time, status, tries) 
@@ -143,6 +154,8 @@ func InsertTask(db *sql.DB, somKey int, cloudFunction string, argument string, d
 	if err != nil {
 		return 0, fmt.Errorf("InsertTask: db.Prepare: %w", err)
 	}
+	defer stmt.Close()
+
 	result, err := stmt.Exec(somKey, cloudFunction, argument, desiredReturnCode, scheduledTime, TaskReady, 0)
 	if err != nil {
 		return 0, fmt.Errorf("InsertTask: stmt.Exec: %w", err)
@@ -164,6 +177,8 @@ func UpdateTask(db *sql.DB, taskId int, scheduledTime time.Time, status TaskStat
 	if err != nil {
 		return fmt.Errorf("UpdateTask: db.Prepare: %w", err)
 	}
+	defer stmt.Close()
+
 	result, err := stmt.Exec(status, tries, scheduledTime, taskId) 
 	if err != nil {
 		return fmt.Errorf("UpdateTask: stmt.Exec: %w", err)

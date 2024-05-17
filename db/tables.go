@@ -3,9 +3,11 @@ package db
 import (
 	"database/sql"
 	"fmt"
+
+    _ "github.com/mattn/go-sqlite3"
 )
 
-func SetupTables(db *sql.DB) error {
+func CreateTables(db *sql.DB) error {
 	err := CreateSomsTable(db)
 	if err != nil {
 		return fmt.Errorf("SetupDatabase: %w", err)
@@ -14,7 +16,7 @@ func SetupTables(db *sql.DB) error {
 	if err != nil {
 		return fmt.Errorf("SetupDatabase: %w", err)
 	}
-	return err
+	return nil
 }
 
 func CreateSomsTable(db *sql.DB) error {
@@ -30,7 +32,7 @@ func CreateSomsTable(db *sql.DB) error {
 	if err != nil {
 		return fmt.Errorf("CreateSomsTable: db.Exec: %w", err)
 	}
-	return err
+	return nil
 }
 
 // TODO: Add scheduled time
@@ -51,6 +53,6 @@ func CreateTasksTable(db *sql.DB) error {
 	if err != nil {
 		return fmt.Errorf("CreateTasksTable: db.Exec: %w", err)
 	}
-	return err
+	return nil
 }
 

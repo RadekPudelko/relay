@@ -20,8 +20,8 @@ import (
 )
 
 var particleToken string
-var dbConn *sql.DB
-var sem = make(chan int, 3)
+var myDB *sql.DB
+var taskLimit = 10
 
 type CreateTaskRequest struct {
 	SomId             string     `json:"som_id"`
@@ -43,18 +43,54 @@ func (p CreateTaskRequest) String() string {
 	return str
 }
 
+func CreateTask(dbConn *sql.DB, somId string, productId int, cloudFunction string, argument string, desiredReturnCode sql.NullInt32, scheduledTime time.Time) (int, error) {
+	somKey, err := db.InsertOrUpdateSom(dbConn, somId, productId)
+	if err != nil {
+        return 0, fmt.Errorf("createTaskHandler: %w", err)
+	}
+
+	taskId, err := db.InsertTask(dbConn, somKey, cloudFunction, argument, desiredReturnCode, scheduledTime)
+	if err != nil {
+        return 0, fmt.Errorf("CreateTask: %w", err)
+	}
+
+    return taskId, nil
+}
+
+// Queries for upto limit tasks in the db that are scheduled after scheduled time, starting from the id
+// of the last task that was ran and wraps around if needed
+func GetReadyTasks(myDB *sql.DB, id, limit int, scheduledTime time.Time) ([]int, error) {
+    start := id+1
+    taskIds, err := db.SelectTaskIds(myDB, db.TaskReady, &start, nil, &taskLimit, scheduledTime)
+    if err != nil {
+        return nil, fmt.Errorf("GetReadyTasks for %d onward: %w", id+1, err)
+    }
+    if len(taskIds) < taskLimit {
+        start := id-1
+        limit := taskLimit - len(taskIds)
+        taskIds2, err := db.SelectTaskIds(myDB, db.TaskReady, nil, &start, &limit, scheduledTime)
+        if err != nil {
+            return nil, fmt.Errorf("GetReadyTasks for 1 to %d: %w", id-1, err)
+        }
+        taskIds = append(taskIds, taskIds2...)
+    }
+    return taskIds, nil
+}
+
+// TODO make backgroundTask sleep when there are no tasks, wake by new task post?
 func backgroundTask() {
+	var sem = make(chan int, 3)
 	lastTaskId := 0
 	for true {
 		// Get ready tasks, starting from the lastTaskId, limited 1 per som
 		// This implementation does not care about the order of tasks
 		// To take into account order, would first need to get list of soms with ready tasks, then query the min for each
-		taskIds, err := db.SelectTaskIds(dbConn, db.TaskReady, lastTaskId, time.Now(), 10)
+		taskIds, err := GetReadyTasks(myDB, lastTaskId, taskLimit, time.Now().UTC())
 		if err != nil {
 			log.Fatal("backgroundTask: ", err)
 		}
 
-		log.Printf("Loading %d ready tasks ids from the dbConn\n", len(taskIds))
+		log.Printf("Loading %d ready tasks ids from the myDB\n", len(taskIds))
 		if len(taskIds) == 0 {
 			lastTaskId = 0
 			time.Sleep(2 * time.Second)
@@ -63,7 +99,7 @@ func backgroundTask() {
 		nTasks := len(taskIds)
 		lastTaskId = taskIds[nTasks-1]
 
-        // TODO: Load additional requests in the background as tasks are processed
+		// TODO: Load additional requests in the background as tasks are processed
 		for _, taskId := range taskIds {
 			sem <- 1
 			go func(id int) {
@@ -74,9 +110,10 @@ func backgroundTask() {
 	}
 }
 
+// TODO: Update the schedule time of the task if its been recently pinged and offline, ping fails or device is offile
 func processTask(id int) {
 	log.Println("processTask: process task ", id)
-	task, err := db.SelectTask(dbConn, id)
+	task, err := db.SelectTask(myDB, id)
 	if err != nil {
 		log.Println("processTask:", err)
 		return
@@ -93,7 +130,7 @@ func processTask(id int) {
 		now := sql.NullTime{Time: time.Now(), Valid: true}
 		if err != nil {
 			log.Println("processTask:", err)
-			err = db.UpdateSom(dbConn, task.Som.Id, task.Som.ProductId, task.Som.LastOnline, now)
+			err = db.UpdateSom(myDB, task.Som.Id, task.Som.ProductId, task.Som.LastOnline, now)
 			if err != nil {
 				log.Println("processTask: ", err)
 			}
@@ -101,15 +138,17 @@ func processTask(id int) {
 		}
 		if !online {
 			log.Printf("processTask: som %s is offline\n", task.Som.SomId)
-			err = db.UpdateSom(dbConn, task.Som.Id, task.Som.ProductId, task.Som.LastOnline, now)
+			err = db.UpdateSom(myDB, task.Som.Id, task.Som.ProductId, task.Som.LastOnline, now)
+			// TODO: This and many places like this should never fail, so should the server crash here??
 			if err != nil {
 				log.Println("processTask: ", err)
 			}
 			return
 		}
-		err = db.UpdateSom(dbConn, task.Som.Id, task.Som.ProductId, now, now)
+		err = db.UpdateSom(myDB, task.Som.Id, task.Som.ProductId, now, now)
 		if err != nil {
 			log.Println("processTask:", err)
+			return
 		}
 	}
 
@@ -123,9 +162,9 @@ func processTask(id int) {
 		log.Println("processTask:", err)
 		if task.Tries == 2 { // Task is considered failed on third attempt
 			log.Printf("processTask task %d has failed due to exceeding max tries, err %v:\n", id, err)
-			err = db.UpdateTask(dbConn, id, task.ScheduledTime, db.TaskFailed, task.Tries+1)
+			err = db.UpdateTask(myDB, id, task.ScheduledTime, db.TaskFailed, task.Tries+1)
 		} else {
-			err = db.UpdateTask(dbConn, id, fiveMinLater, db.TaskReady, task.Tries+1)
+			err = db.UpdateTask(myDB, id, fiveMinLater, db.TaskReady, task.Tries+1)
 		}
 		if err != nil {
 			log.Println("processTask:", err)
@@ -135,10 +174,10 @@ func processTask(id int) {
 	}
 	if !success {
 		log.Printf("processTask task %d has failed due to mismatch in returned code\n", id)
-		err = db.UpdateTask(dbConn, id, task.ScheduledTime, db.TaskFailed, task.Tries+1)
+		err = db.UpdateTask(myDB, id, task.ScheduledTime, db.TaskFailed, task.Tries+1)
 	} else {
 		log.Printf("processTask: task %d, success\n", id)
-		err = db.UpdateTask(dbConn, id, task.ScheduledTime, db.TaskComplete, task.Tries+1)
+		err = db.UpdateTask(myDB, id, task.ScheduledTime, db.TaskComplete, task.Tries+1)
 	}
 	if err != nil {
 		log.Println("processTask:", err)
@@ -163,7 +202,7 @@ func getTaskHandler(w http.ResponseWriter, r *http.Request) {
 
 	log.Printf("getTaskHandler: request for task %d\n", taskId)
 
-	task, err := db.SelectTask(dbConn, taskId)
+	task, err := db.SelectTask(myDB, taskId)
 	if err != nil {
 		log.Println("getTaskHandler: ", err)
 		http.Error(w, "Error in getting task", http.StatusInternalServerError)
@@ -215,29 +254,30 @@ func createTaskHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	somKey, err := db.InsertOrUpdateSom(dbConn, req.SomId, req.ProductId)
-	if err != nil {
-		log.Println("createTaskHandler:", err.Error())
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-
 	// TODO: validate the scheduled time
-	scheduledTime := time.Now()
+	scheduledTime := time.Now().UTC()
 	if req.ScheduledTime != nil {
 		scheduledTime = *req.ScheduledTime
+        scheduledTime = scheduledTime.UTC()
 	}
 	argument := ""
 	if req.Argument != nil {
 		argument = *req.Argument
 	}
 
-	taskId, err := db.InsertTask(dbConn, somKey, req.CloudFunction, argument, req.DesiredReturnCode, scheduledTime)
+    desiredReturnCode := sql.NullInt32{Int32: 0, Valid: false}
+    if req.DesiredReturnCode != nil {
+        desiredReturnCode = sql.NullInt32{Int32: int32(*req.DesiredReturnCode), Valid: true}
+    }
+
+    // TODO: I dont think the product id is strictly required, maybe I drop it
+    taskId, err := CreateTask(myDB, req.SomId, req.ProductId, req.CloudFunction, argument, desiredReturnCode, scheduledTime)
 	if err != nil {
 		log.Println("createTaskHandler:", err.Error())
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
+
 	log.Printf("createTaskHandler: new task created, id: %d scheduled for %s\n", taskId, scheduledTime.String())
 
 	w.Header().Set("Content-Type", "application/json")
@@ -249,6 +289,25 @@ func getRoot(w http.ResponseWriter, r *http.Request) {
 	io.WriteString(w, "Hello, HTTP!\n")
 }
 
+func SetupDB(path string) (error) {
+    var err error
+	myDB, err = db.Connect(path)
+	if err != nil {
+        return fmt.Errorf("SetupDB: %w", err)
+	}
+
+	err = db.CreateTables(myDB)
+	if err != nil {
+        myDB.Close()
+        return fmt.Errorf("SetupDB: %w", err)
+	}
+    return nil
+}
+
+func CloseDB() {
+    myDB.Close()
+}
+
 func main() {
 	fmt.Printf("Hello\n")
 	var err error
@@ -258,23 +317,17 @@ func main() {
 		log.Fatalf("main: Error loading .env file: %v", err)
 	}
 
+	// TODO: Test the token
 	particleToken = os.Getenv("PARTICLE_TOKEN")
 	if particleToken == "" {
 		log.Fatalf("main: missing PARTICLE_TOKEN in .env file")
 	}
-	// TODO: Test the token
 
-	// TODO: What is a database pool?
-	dbConn, err = db.Connect("my.db3")
+    err = SetupDB("my.db3")
 	if err != nil {
 		log.Fatal("main: %w", err)
 	}
-	defer dbConn.Close()
-
-	err = db.SetupTables(dbConn)
-	if err != nil {
-		log.Fatal("main: %w", err)
-	}
+	defer myDB.Close()
 
 	go backgroundTask()
 

@@ -66,6 +66,8 @@ func UpdateSom(db *sql.DB, id int, product int, onlineTime, pingTime sql.NullTim
 	if err != nil {
 		return fmt.Errorf("UpdateSom: db.Prepare: %w", err)
 	}
+	defer stmt.Close()
+
 	result, err := stmt.Exec(product, onlineTime, pingTime, id)
 	if err != nil {
 		return fmt.Errorf("UpdateSom: stmt.Exec: %w", err)
@@ -86,6 +88,8 @@ func InsertSom(db *sql.DB, somId string, productId int) (int, error) {
 	if err != nil {
 		return 0, fmt.Errorf("InsertSom: db.Prepare: %w", err)
 	}
+	defer stmt.Close()
+
 	result, err := stmt.Exec(somId, productId, nil, nil)
 	if err != nil {
 		return 0, fmt.Errorf("InsertSom: stmt.Exec: %w", err)
