@@ -98,7 +98,6 @@ func SelectTask(db *sql.DB, id int) (*Task, error) {
 // Max of 1 taks per som is reutrned (WHERE rn = 1)
 func SelectTaskIds(db *sql.DB, status TaskStatus, startId, endId, limit *int, scheduledTime time.Time) ([]int, error) {
     params := []interface{}{status}
-
     query := `
         SELECT MIN(id)
         FROM tasks
@@ -121,8 +120,8 @@ func SelectTaskIds(db *sql.DB, status TaskStatus, startId, endId, limit *int, sc
     }
 
     // TODO: figure out how to pretty print these dynamic queries
-    fmt.Println(query)
-    fmt.Println(params)
+    // fmt.Println(query)
+    // fmt.Println(params)
 
 	stmt, err := db.Prepare(query)
 	if err != nil {

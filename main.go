@@ -365,6 +365,14 @@ func main() {
 	if particleToken == "" {
 		log.Fatalf("main: missing PARTICLE_TOKEN in .env file")
 	}
+    tokenValid, err := particle.TestToken(particleToken)
+    if err != nil {
+        log.Fatalf("main: %+v", err)
+    }
+    if !tokenValid {
+        log.Fatalf("main: particle token is not valid")
+    }
+
 
 	err = SetupDB("my.db3")
 	if err != nil {

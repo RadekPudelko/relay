@@ -61,7 +61,7 @@ func CloudFunction(somId string, productId int, cloudFunction string, argument s
     params.Add("access_token", token)
     params.Add("arg", argument)
 
-    url := fmt.Sprintf("https://api.particle.io/v1/products/%d/devices/%s/%s", 
+    url := fmt.Sprintf("https://api.particle.io/v1/products/%d/devices/%s/%s",
         productId, somId, cloudFunction)
 
     // This can block for a long time
@@ -98,5 +98,37 @@ func CloudFunction(somId string, productId int, cloudFunction string, argument s
         return data.ReturnValue == int(returnValue.Int64), nil
     }
     return true, nil
+}
+
+// Makes a test request to particle to see if the token is valid, should get a 200 on a list device request
+func TestToken(token string) (bool, error) {
+    params := url.Values{}
+    params.Add("access_token", token)
+    url := "https://api.particle.io/v1/devices"
+
+    req, err := http.NewRequest("GET", url, nil)
+    if err != nil {
+        return false, fmt.Errorf("particle.TestToken: http.NewRequest: %w", err)
+    }
+    req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", token))
+
+    client := &http.Client{}
+    resp, err := client.Do(req)
+    if err != nil {
+        return false, fmt.Errorf("particle.TestToken: client.Do: %w", err)
+    }
+    defer resp.Body.Close()
+
+    if resp.StatusCode== 200 {
+        return true, nil
+    } else if resp.StatusCode== 401 { // Bad token
+        return false, nil
+    } else {
+        body, err := io.ReadAll(resp.Body)
+        if err != nil {
+            return false, fmt.Errorf("particle.TestToken: io.ReadAll: %w,  body %s", err, body)
+        }
+        return false, fmt.Errorf("particle.TestToken: Unexpected response from Particle: %d:, body: %s", resp.StatusCode, string(body))
+    }
 }
 
