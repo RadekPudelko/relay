@@ -29,6 +29,7 @@ type CreateTaskRequest struct {
 	CloudFunction     string     `json:"cloud_function"`
 	Argument          *string    `json:"argument,omitempty"`
 	DesiredReturnCode *int       `json:"desired_return_code,omitempty"`
+    // TODO time comes in a as a string need to parse
 	ScheduledTime     *time.Time `json:"scheduled_time,omitempty"`
 }
 
@@ -43,38 +44,80 @@ func (p CreateTaskRequest) String() string {
 	return str
 }
 
-func CreateTask(dbConn *sql.DB, somId string, productId int, cloudFunction string, argument string, desiredReturnCode sql.NullInt32, scheduledTime time.Time) (int, error) {
+func parseDateTime(dateStr string) (time.Time, error) {
+	layouts := []string{
+		"2006-01-02 15:04:05",  // full date with time
+		"2006-01-02 15:04:05",  // full date with time
+		"2006-01-02 15:04",     // Date with hours and minutes
+		"2006-01-02 15",        // Date with hours
+		"2006-01-02",           // Date only
+		"2006-01-02T15:04:05",  // ISO 8601 with time
+		"2006-01-02T15:04",     // ISO 8601 with hours and minutes
+		"2006-01-02T15",        // ISO 8601 with hours
+	}
+
+	var t time.Time
+	var err error
+	for _, layout := range layouts {
+		t, err = time.Parse(layout, dateStr)
+		if err == nil {
+			return t, nil
+		}
+	}
+
+	return t, fmt.Errorf("unable to parse date string: %s", dateStr)
+}
+
+func ParseTime(timeStr string) (sql.NullTime, error) {
+    var res sql.NullTime
+    res.Valid = false
+    if timeStr == "" {
+        return res, nil
+    }
+    const layout = "2024-05-17 19:03:38+00:00"
+    t, err := time.Parse(layout, timeStr)
+    if err != nil {
+        const layout = "2024-05-17 19:03:38"
+        t, err = time.Parse(layout, timeStr)
+        if err != nil {
+            return res, fmt.Errorf("Invalid start time format. Use '2024-05-17 19:03:38' or '2024-05-17 19:03:38+00:00'")
+        }
+    }
+    res = sql.NullTime{Valid: true, Time: t}
+    return res, nil
+}
+
+func CreateTask(dbConn *sql.DB, somId string, productId int, cloudFunction string, argument string, desiredReturnCode sql.NullInt64, scheduledTime time.Time) (int, error) {
 	somKey, err := db.InsertOrUpdateSom(dbConn, somId, productId)
 	if err != nil {
-        return 0, fmt.Errorf("createTaskHandler: %w", err)
+		return 0, fmt.Errorf("createTaskHandler: %w", err)
 	}
 
 	taskId, err := db.InsertTask(dbConn, somKey, cloudFunction, argument, desiredReturnCode, scheduledTime)
 	if err != nil {
-        return 0, fmt.Errorf("CreateTask: %w", err)
+		return 0, fmt.Errorf("CreateTask: %w", err)
 	}
 
-    return taskId, nil
+	return taskId, nil
 }
 
-// Queries for upto limit tasks in the db that are scheduled after scheduled time, starting from the id
-// of the last task that was ran and wraps around if needed
+// Queries for upto limit tasks in the db that are scheduled after scheduled time from id to id - 1 (inclusive)
 func GetReadyTasks(myDB *sql.DB, id, limit int, scheduledTime time.Time) ([]int, error) {
-    start := id+1
-    taskIds, err := db.SelectTaskIds(myDB, db.TaskReady, &start, nil, &taskLimit, scheduledTime)
-    if err != nil {
-        return nil, fmt.Errorf("GetReadyTasks for %d onward: %w", id+1, err)
-    }
-    if len(taskIds) < taskLimit {
-        start := id-1
-        limit := taskLimit - len(taskIds)
-        taskIds2, err := db.SelectTaskIds(myDB, db.TaskReady, nil, &start, &limit, scheduledTime)
-        if err != nil {
-            return nil, fmt.Errorf("GetReadyTasks for 1 to %d: %w", id-1, err)
-        }
-        taskIds = append(taskIds, taskIds2...)
-    }
-    return taskIds, nil
+	taskIds, err := db.SelectTaskIds(myDB, db.TaskReady, &id, nil, &limit, scheduledTime)
+	if err != nil {
+		return nil, fmt.Errorf("GetReadyTasks for %d onward: %w", id+1, err)
+	}
+    // TODO: If we don't get enough tasks, get the tasks upto id (exclusive) and try to add them to the list (need to check for unique soms)
+	// if len(taskIds) < limit && id > 1 {
+	// 	end := id - 1
+	// 	limit := limit - len(taskIds)
+	// 	taskIds2, err := db.SelectTaskIds(myDB, db.TaskReady, nil, &end, &limit, scheduledTime)
+	// 	if err != nil {
+	// 		return nil, fmt.Errorf("GetReadyTasks for 1 to %d: %w", id-1, err)
+	// 	}
+	// 	taskIds = append(taskIds, taskIds2...)
+	// }
+	return taskIds, nil
 }
 
 // TODO make backgroundTask sleep when there are no tasks, wake by new task post?
@@ -258,20 +301,20 @@ func createTaskHandler(w http.ResponseWriter, r *http.Request) {
 	scheduledTime := time.Now().UTC()
 	if req.ScheduledTime != nil {
 		scheduledTime = *req.ScheduledTime
-        scheduledTime = scheduledTime.UTC()
+		scheduledTime = scheduledTime.UTC()
 	}
 	argument := ""
 	if req.Argument != nil {
 		argument = *req.Argument
 	}
 
-    desiredReturnCode := sql.NullInt32{Int32: 0, Valid: false}
-    if req.DesiredReturnCode != nil {
-        desiredReturnCode = sql.NullInt32{Int32: int32(*req.DesiredReturnCode), Valid: true}
-    }
+	desiredReturnCode := sql.NullInt64{Int64: 0, Valid: false}
+	if req.DesiredReturnCode != nil {
+		desiredReturnCode = sql.NullInt64{Int64: int64(*req.DesiredReturnCode), Valid: true}
+	}
 
-    // TODO: I dont think the product id is strictly required, maybe I drop it
-    taskId, err := CreateTask(myDB, req.SomId, req.ProductId, req.CloudFunction, argument, desiredReturnCode, scheduledTime)
+	// TODO: I dont think the product id is strictly required, maybe I drop it
+	taskId, err := CreateTask(myDB, req.SomId, req.ProductId, req.CloudFunction, argument, desiredReturnCode, scheduledTime)
 	if err != nil {
 		log.Println("createTaskHandler:", err.Error())
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -289,23 +332,23 @@ func getRoot(w http.ResponseWriter, r *http.Request) {
 	io.WriteString(w, "Hello, HTTP!\n")
 }
 
-func SetupDB(path string) (error) {
-    var err error
+func SetupDB(path string) error {
+	var err error
 	myDB, err = db.Connect(path)
 	if err != nil {
-        return fmt.Errorf("SetupDB: %w", err)
+		return fmt.Errorf("SetupDB: %w", err)
 	}
 
 	err = db.CreateTables(myDB)
 	if err != nil {
-        myDB.Close()
-        return fmt.Errorf("SetupDB: %w", err)
+		myDB.Close()
+		return fmt.Errorf("SetupDB: %w", err)
 	}
-    return nil
+	return nil
 }
 
 func CloseDB() {
-    myDB.Close()
+	myDB.Close()
 }
 
 func main() {
@@ -323,7 +366,7 @@ func main() {
 		log.Fatalf("main: missing PARTICLE_TOKEN in .env file")
 	}
 
-    err = SetupDB("my.db3")
+	err = SetupDB("my.db3")
 	if err != nil {
 		log.Fatal("main: %w", err)
 	}

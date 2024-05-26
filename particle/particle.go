@@ -56,7 +56,7 @@ func Ping(somId string, productId int, token string) (bool, error) {
     return response.Online, nil
 }
 
-func CloudFunction(somId string, productId int, cloudFunction string, argument string, token string, returnValue sql.NullInt32) (bool, error) {
+func CloudFunction(somId string, productId int, cloudFunction string, argument string, token string, returnValue sql.NullInt64) (bool, error) {
     params := url.Values{}
     params.Add("access_token", token)
     params.Add("arg", argument)
@@ -95,7 +95,7 @@ func CloudFunction(somId string, productId int, cloudFunction string, argument s
     }
 
     if returnValue.Valid {
-        return data.ReturnValue == int(returnValue.Int32), nil
+        return data.ReturnValue == int(returnValue.Int64), nil
     }
     return true, nil
 }

@@ -11,7 +11,7 @@ type Task struct {
 	Som               *Som           `json:"som"`
 	CloudFunction     string         `json:"cloud_function"`
 	Argument          string         `json:"argument"`
-	DesiredReturnCode sql.NullInt32  `json:"desired_return_code"`
+	DesiredReturnCode sql.NullInt64  `json:"desired_return_code"`
     ScheduledTime time.Time `json:"scheduled_time"`
 	Status            TaskStatus     `json:"status"`
 	Tries             int            `json:"tries"`
@@ -21,6 +21,20 @@ func (t Task) String() string {
     return fmt.Sprintf("task id: %d, som: %s, product:%d, function:%s, argument %s", t.Id, t.Som.SomId, t.Som.ProductId, t.CloudFunction, t.Argument)
 }
 
+// func NewTask(id int, som *Som, cloudFunction, argument string, desiredReturnCode sql.NullInt64, scheduledTime time.Time, status TaskStatus, tries int) Contact {
+//     return Task {
+//         Id: id,
+//         Som
+//
+//
+//     }
+// 	return Contact{
+// 		Id:    id,
+// 		Name:  name,
+// 		Email: email,
+// 	}
+// }
+
 type TaskStatus int
 const (
 	TaskReady    TaskStatus = 0
@@ -28,7 +42,7 @@ const (
 	TaskComplete TaskStatus = 2
 )
 
-// Example of custom field serialization so that instead of reporting sql.NullFields 
+// Example of custom field serialization so that instead of reporting sql.NullFields
 // as   "response_text": {
   //   "String": "",
   //   "Valid": false
@@ -64,7 +78,7 @@ func SelectTask(db *sql.DB, id int) (*Task, error) {
 	row := stmt.QueryRow(id)
 	var task Task
 	var somKey int
-	err = row.Scan(&task.Id, &somKey, &task.CloudFunction, &task.Argument, 
+	err = row.Scan(&task.Id, &somKey, &task.CloudFunction, &task.Argument,
         &task.DesiredReturnCode, &task.ScheduledTime, &task.Status, &task.Tries)
 	if err != nil {
 		if err == sql.ErrNoRows {
@@ -80,25 +94,41 @@ func SelectTask(db *sql.DB, id int) (*Task, error) {
 	return &task, nil
 }
 
+// Select the tasks with desired status between with ids betwween start and end (inclusive) occuring after scheduled time.
+// Max of 1 taks per som is reutrned (WHERE rn = 1)
 func SelectTaskIds(db *sql.DB, status TaskStatus, startId, endId, limit *int, scheduledTime time.Time) ([]int, error) {
     params := []interface{}{status}
-    query := `SELECT MIN(id) AS id FROM tasks WHERE status = ?`
+    query := `
+        WITH TasksBySom AS (
+            SELECT id,
+            som_key,
+            ROW_NUMBER() OVER (PARTITION BY som_key ORDER BY id) as rn
+            FROM tasks
+            WHERE status = ?
+    `
     if startId != nil {
         query += ` AND id >= ?`
-        params = append(params, startId)
+        params = append(params, *startId)
     }
     if endId != nil {
         query += ` AND id <= ?`
-        params = append(params, endId)
+        params = append(params, *endId)
     }
-    query += ` AND scheduled_time < ? ORDER BY id ASC`
+    query += ` AND scheduled_time >= ? ORDER BY id ASC)`
     params = append(params, scheduledTime)
+    query += `
+        SELECT id
+        FROM TasksBySom
+        WHERE rn = 1
+    `
     if limit != nil {
         query += ` LIMIT ?`
-        params = append(params, limit)
+        params = append(params, *limit)
     }
-    fmt.Println(query)
-    fmt.Println(params)
+
+    // TODO: figure out how to pretty print these dynamic queries
+    // fmt.Println(query)
+    // fmt.Println(params)
 
 	stmt, err := db.Prepare(query)
 	if err != nil {
@@ -117,7 +147,6 @@ func SelectTaskIds(db *sql.DB, status TaskStatus, startId, endId, limit *int, sc
     if !rows.Next() {
         return taskIds, nil
     }
-
     // SELECT MIN will return a null row if there aren't any tasks instead of 0 rows
     var taskId sql.NullInt32
     if err := rows.Scan(&taskId); err != nil {
@@ -135,6 +164,7 @@ func SelectTaskIds(db *sql.DB, status TaskStatus, startId, endId, limit *int, sc
 		if err := rows.Scan(&taskId); err != nil {
 			return nil, fmt.Errorf("SelectTaskIds: rows.Scan: %w", err)
 		}
+        fmt.Println("task ", taskId)
 		taskIds = append(taskIds, taskId)
 	}
 	// Is this necessary?
@@ -144,10 +174,10 @@ func SelectTaskIds(db *sql.DB, status TaskStatus, startId, endId, limit *int, sc
 	return taskIds, nil
 }
 
-func InsertTask(db *sql.DB, somKey int, cloudFunction string, argument string, desiredReturnCode sql.NullInt32, scheduledTime time.Time) (int, error) {
+func InsertTask(db *sql.DB, somKey int, cloudFunction string, argument string, desiredReturnCode sql.NullInt64, scheduledTime time.Time) (int, error) {
 	const query string = `
-        INSERT INTO tasks 
-        (som_key, cloud_function, argument, desired_return_code, scheduled_time, status, tries) 
+        INSERT INTO tasks
+        (som_key, cloud_function, argument, desired_return_code, scheduled_time, status, tries)
         VALUES (?, ?, ?, ?, ?, ?, ?)
         `
 	stmt, err := db.Prepare(query)
@@ -167,9 +197,9 @@ func InsertTask(db *sql.DB, somKey int, cloudFunction string, argument string, d
 	return int(id), nil
 }
 
-func UpdateTask(db *sql.DB, taskId int, scheduledTime time.Time, status TaskStatus, tries int, ) (error) {
+func UpdateTask(db *sql.DB, taskId int, scheduledTime time.Time, status TaskStatus, tries int) (error) {
 	const query string = `
-        UPDATE tasks 
+        UPDATE tasks
         SET status = ?, tries = ?, scheduled_time = ?
         WHERE id = ?
         `
@@ -179,7 +209,7 @@ func UpdateTask(db *sql.DB, taskId int, scheduledTime time.Time, status TaskStat
 	}
 	defer stmt.Close()
 
-	result, err := stmt.Exec(status, tries, scheduledTime, taskId) 
+	result, err := stmt.Exec(status, tries, scheduledTime, taskId)
 	if err != nil {
 		return fmt.Errorf("UpdateTask: stmt.Exec: %w", err)
 	}
@@ -187,7 +217,6 @@ func UpdateTask(db *sql.DB, taskId int, scheduledTime time.Time, status TaskStat
     // Is this necessary?
     rows, err := result.RowsAffected()
     if err != nil {
-        fmt.Println("Error getting rows affected:", err)
 		return fmt.Errorf("UpdateTask: result.RowsAffected: %w", err)
     }
     if rows != 1 {
