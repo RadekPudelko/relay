@@ -179,6 +179,12 @@ func TestGetReadyTasks(t *testing.T) {
 	desiredReturnCode := sql.NullInt64{Int64: 0, Valid: false}
     timeStr0 := "2024-05-14 20:17:32.897647+00:00"
 
+    // No tasks
+    err = testGetReadyTasks(dbConn, timeStr0, 0, 10, []int{})
+    if err != nil {
+		t.Fatalf("TestGetReadyTasks: %+v", err)
+    }
+
     // som0
     t0, err := createCustomTask(dbConn, somId, productId, cloudFunction, argument, desiredReturnCode, timeStr0, db.TaskReady)
 	if err != nil {

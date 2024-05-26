@@ -98,13 +98,11 @@ func SelectTask(db *sql.DB, id int) (*Task, error) {
 // Max of 1 taks per som is reutrned (WHERE rn = 1)
 func SelectTaskIds(db *sql.DB, status TaskStatus, startId, endId, limit *int, scheduledTime time.Time) ([]int, error) {
     params := []interface{}{status}
+
     query := `
-        WITH TasksBySom AS (
-            SELECT id,
-            som_key,
-            ROW_NUMBER() OVER (PARTITION BY som_key ORDER BY id) as rn
-            FROM tasks
-            WHERE status = ?
+        SELECT MIN(id)
+        FROM tasks
+        WHERE status = ?
     `
     if startId != nil {
         query += ` AND id >= ?`
@@ -114,21 +112,17 @@ func SelectTaskIds(db *sql.DB, status TaskStatus, startId, endId, limit *int, sc
         query += ` AND id <= ?`
         params = append(params, *endId)
     }
-    query += ` AND scheduled_time >= ? ORDER BY id ASC)`
+    query += ` AND scheduled_time >= ?`
     params = append(params, scheduledTime)
-    query += `
-        SELECT id
-        FROM TasksBySom
-        WHERE rn = 1
-    `
+    query += ` GROUP BY som_key ORDER by id`
     if limit != nil {
         query += ` LIMIT ?`
         params = append(params, *limit)
     }
 
     // TODO: figure out how to pretty print these dynamic queries
-    // fmt.Println(query)
-    // fmt.Println(params)
+    fmt.Println(query)
+    fmt.Println(params)
 
 	stmt, err := db.Prepare(query)
 	if err != nil {
