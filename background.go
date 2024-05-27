@@ -1,12 +1,13 @@
 package main
-import(
-	"log"
-    "time"
-	"database/sql"
-    "fmt"
 
-    "pcfs/particle"
+import (
+	"database/sql"
+	"fmt"
+	"log"
+	"time"
+
 	"pcfs/db"
+	"pcfs/particle"
 )
 
 // TODO make backgroundTask sleep when there are no tasks, wake by new task post?
@@ -17,7 +18,7 @@ func BackgroundTask(config Config, dbConn *sql.DB, particle particle.ParticlePro
 		// Get ready tasks, starting from the lastTaskId, limited 1 per som
 		// This implementation does not care about the order of tasks
 		// To take into account order, would first need to get list of soms with ready tasks, then query the min for each
-        taskIds, err := GetReadyTasks(dbConn, lastTaskId, config.TaskLimit, time.Now().UTC())
+		taskIds, err := GetReadyTasks(dbConn, lastTaskId, config.TaskLimit, time.Now().UTC())
 		if err != nil {
 			log.Fatal("backgroundTask: ", err)
 		}
@@ -116,14 +117,13 @@ func processTask(config Config, dbConn *sql.DB, particle particle.ParticleProvid
 	}
 }
 
-
 // Queries for upto limit tasks in the db that are scheduled after scheduled time from id to id - 1 (inclusive)
 func GetReadyTasks(dbConn *sql.DB, id, limit int, scheduledTime time.Time) ([]int, error) {
 	taskIds, err := db.SelectTaskIds(dbConn, db.TaskReady, &id, nil, &limit, scheduledTime)
 	if err != nil {
 		return nil, fmt.Errorf("GetReadyTasks for %d onward: %w", id+1, err)
 	}
-    // TODO: If we don't get enough tasks, get the tasks upto id (exclusive) and try to add them to the list (need to check for unique soms)
+	// TODO: If we don't get enough tasks, get the tasks upto id (exclusive) and try to add them to the list (need to check for unique soms)
 	// if len(taskIds) < limit && id > 1 {
 	// 	end := id - 1
 	// 	limit := limit - len(taskIds)
@@ -135,4 +135,3 @@ func GetReadyTasks(dbConn *sql.DB, id, limit int, scheduledTime time.Time) ([]in
 	// }
 	return taskIds, nil
 }
-

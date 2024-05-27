@@ -1,21 +1,21 @@
 package main
 
-import(
+import (
 	"database/sql"
-    "time"
-    "fmt"
+	"fmt"
+	"time"
 )
 
 func parseDateTime(dateStr string) (time.Time, error) {
 	layouts := []string{
-		"2006-01-02 15:04:05",  // full date with time
-		"2006-01-02 15:04:05",  // full date with time
-		"2006-01-02 15:04",     // Date with hours and minutes
-		"2006-01-02 15",        // Date with hours
-		"2006-01-02",           // Date only
-		"2006-01-02T15:04:05",  // ISO 8601 with time
-		"2006-01-02T15:04",     // ISO 8601 with hours and minutes
-		"2006-01-02T15",        // ISO 8601 with hours
+		"2006-01-02 15:04:05", // full date with time
+		"2006-01-02 15:04:05", // full date with time
+		"2006-01-02 15:04",    // Date with hours and minutes
+		"2006-01-02 15",       // Date with hours
+		"2006-01-02",          // Date only
+		"2006-01-02T15:04:05", // ISO 8601 with time
+		"2006-01-02T15:04",    // ISO 8601 with hours and minutes
+		"2006-01-02T15",       // ISO 8601 with hours
 	}
 
 	var t time.Time
@@ -31,21 +31,20 @@ func parseDateTime(dateStr string) (time.Time, error) {
 }
 
 func ParseTime(timeStr string) (sql.NullTime, error) {
-    var res sql.NullTime
-    res.Valid = false
-    if timeStr == "" {
-        return res, nil
-    }
-    const layout = "2024-05-17 19:03:38+00:00"
-    t, err := time.Parse(layout, timeStr)
-    if err != nil {
-        const layout = "2024-05-17 19:03:38"
-        t, err = time.Parse(layout, timeStr)
-        if err != nil {
-            return res, fmt.Errorf("Invalid start time format. Use '2024-05-17 19:03:38' or '2024-05-17 19:03:38+00:00'")
-        }
-    }
-    res = sql.NullTime{Valid: true, Time: t}
-    return res, nil
+	var res sql.NullTime
+	res.Valid = false
+	if timeStr == "" {
+		return res, nil
+	}
+	const layout = "2024-05-17 19:03:38+00:00"
+	t, err := time.Parse(layout, timeStr)
+	if err != nil {
+		const layout = "2024-05-17 19:03:38"
+		t, err = time.Parse(layout, timeStr)
+		if err != nil {
+			return res, fmt.Errorf("Invalid start time format. Use '2024-05-17 19:03:38' or '2024-05-17 19:03:38+00:00'")
+		}
+	}
+	res = sql.NullTime{Valid: true, Time: t}
+	return res, nil
 }
-

@@ -8,7 +8,6 @@ import (
 	"pcfs/db"
 )
 
-
 func TestIntegration(t *testing.T) {
 	dbConn, err := db.Connect("file::memory:?cache=shared")
 	if err != nil {
@@ -28,11 +27,11 @@ func TestIntegration(t *testing.T) {
 	desiredReturnCode := sql.NullInt64{Int64: 0, Valid: false}
 	scheduledTime0 := time.Now().UTC()
 
-    tid, err := testCreateTask(dbConn, somId, productId, cloudFunction, argument, desiredReturnCode, scheduledTime0)
+	tid, err := testCreateTask(dbConn, somId, productId, cloudFunction, argument, desiredReturnCode, scheduledTime0)
 	if err != nil {
 		t.Fatalf("TestCreateTasks: %+v", err)
 	}
-    if tid != 1 {
+	if tid != 1 {
 		t.Fatalf("TestCreateTasks: expected to create task id 1, got %d", tid)
 	}
 
@@ -41,7 +40,7 @@ func TestIntegration(t *testing.T) {
 	if err != nil {
 		t.Fatalf("TestCreateTasks: %+v", err)
 	}
-    if tid != 2 {
+	if tid != 2 {
 		t.Fatalf("TestCreateTasks: expected to create task id 2, got %d", tid)
 	}
 
@@ -50,8 +49,7 @@ func TestIntegration(t *testing.T) {
 	if err != nil {
 		t.Fatalf("TestCreateTasks: %+v", err)
 	}
-    if tid != 3 {
+	if tid != 3 {
 		t.Fatalf("TestCreateTasks: expected to create task id 3, got %d", tid)
 	}
 }
-

@@ -1,13 +1,14 @@
 package main
-import(
-    "net/http"
+
+import (
 	"database/sql"
-    "io"
-    "log"
 	"encoding/json"
-    "time"
-    "fmt"
-    "strconv"
+	"fmt"
+	"io"
+	"log"
+	"net/http"
+	"strconv"
+	"time"
 
 	"pcfs/db"
 )
@@ -15,7 +16,7 @@ import(
 func HandleGetRoot() http.Handler {
 	return http.HandlerFunc(
 		func(w http.ResponseWriter, r *http.Request) {
-            getRoot(w, r)
+			getRoot(w, r)
 		},
 	)
 }
@@ -23,8 +24,8 @@ func HandleGetRoot() http.Handler {
 func HandleCreateTask(dbConn *sql.DB) http.Handler {
 	return http.HandlerFunc(
 		func(w http.ResponseWriter, r *http.Request) {
-            createTaskHandler(dbConn, w, r)
-            getRoot(w, r)
+			createTaskHandler(dbConn, w, r)
+			getRoot(w, r)
 		},
 	)
 }
@@ -32,19 +33,19 @@ func HandleCreateTask(dbConn *sql.DB) http.Handler {
 func HandleGetTask(dbConn *sql.DB) http.Handler {
 	return http.HandlerFunc(
 		func(w http.ResponseWriter, r *http.Request) {
-            getTaskHandler(dbConn, w, r)
+			getTaskHandler(dbConn, w, r)
 		},
 	)
 }
 
 type CreateTaskRequest struct {
-	SomId             string     `json:"som_id"`
-	ProductId         int        `json:"product_id"`
-	CloudFunction     string     `json:"cloud_function"`
-	Argument          *string    `json:"argument,omitempty"`
-	DesiredReturnCode *int       `json:"desired_return_code,omitempty"`
-    // TODO time comes in a as a string need to parse
-	ScheduledTime     *time.Time `json:"scheduled_time,omitempty"`
+	SomId             string  `json:"som_id"`
+	ProductId         int     `json:"product_id"`
+	CloudFunction     string  `json:"cloud_function"`
+	Argument          *string `json:"argument,omitempty"`
+	DesiredReturnCode *int    `json:"desired_return_code,omitempty"`
+	// TODO time comes in a as a string need to parse
+	ScheduledTime *time.Time `json:"scheduled_time,omitempty"`
 }
 
 func (p CreateTaskRequest) String() string {

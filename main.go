@@ -4,9 +4,9 @@ import (
 	"database/sql"
 	"fmt"
 	"log"
+	"net"
 	"net/http"
 	"os"
-    "net"
 
 	"github.com/joho/godotenv"
 	"pcfs/db"
@@ -15,51 +15,51 @@ import (
 
 func main() {
 	fmt.Printf("Hello\n")
-    err := run()
-    if err != nil {
+	err := run()
+	if err != nil {
 		log.Fatal("main: %w", err)
-    }
+	}
 }
 
 func run() error {
-    config := Config{
-        Host: "localhost",
-        Port: "8080",
-        MaxRoutines: 2,
-        TaskLimit: 10,
-        MaxRetries: 3,
-    }
+	config := Config{
+		Host:        "localhost",
+		Port:        "8080",
+		MaxRoutines: 2,
+		TaskLimit:   10,
+		MaxRetries:  3,
+	}
 
-    err := godotenv.Load(".env")
+	err := godotenv.Load(".env")
 	if err != nil {
 		log.Fatalf("run: Error loading .env file: %v", err)
 	}
 
-    particleToken := os.Getenv("PARTICLE_TOKEN")
+	particleToken := os.Getenv("PARTICLE_TOKEN")
 	if particleToken == "" {
 		log.Fatalf("run: missing PARTICLE_TOKEN in .env file")
 	}
-    particle, err := particle.NewParticle(particleToken)
-    if err != nil {
-        log.Fatalf("run: %+v", err)
-    }
+	particle, err := particle.NewParticle(particleToken)
+	if err != nil {
+		log.Fatalf("run: %+v", err)
+	}
 
-    dbPath := os.Getenv("DB")
+	dbPath := os.Getenv("DB")
 	if particleToken == "" {
 		log.Fatalf("run: missing PARTICLE_TOKEN in .env file")
 	}
-    dbConn, err := SetupDB(dbPath)
+	dbConn, err := SetupDB(dbPath)
 	if err != nil {
 		log.Fatal("run: %w", err)
 	}
 	defer dbConn.Close()
 
-    err = Run(config, dbConn, particle)
-    return nil
+	err = Run(config, dbConn, particle)
+	return nil
 }
 
 func SetupDB(path string) (*sql.DB, error) {
-    dbConn, err := db.Connect(path)
+	dbConn, err := db.Connect(path)
 	if err != nil {
 		return nil, fmt.Errorf("SetupDB: %w", err)
 	}
@@ -73,23 +73,22 @@ func SetupDB(path string) (*sql.DB, error) {
 }
 
 func Run(
-    config Config,
-    dbConn *sql.DB,
-    particle particle.ParticleProvider,
+	config Config,
+	dbConn *sql.DB,
+	particle particle.ParticleProvider,
 ) error {
 
 	go BackgroundTask(config, dbConn, particle)
 
-    srv := NewServer(dbConn)
-    httpServer := &http.Server{
-        Addr:    net.JoinHostPort(config.Host, config.Port),
-        Handler: srv,
-    }
-
-    if err := httpServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-		fmt.Fprintf(os.Stderr, "error listening and serving: %s\n", err)
-        return err
+	srv := NewServer(dbConn)
+	httpServer := &http.Server{
+		Addr:    net.JoinHostPort(config.Host, config.Port),
+		Handler: srv,
 	}
-    return nil
-}
 
+	if err := httpServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+		fmt.Fprintf(os.Stderr, "error listening and serving: %s\n", err)
+		return err
+	}
+	return nil
+}
