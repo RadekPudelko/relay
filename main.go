@@ -3,7 +3,7 @@ package main
 import (
 	"database/sql"
 	"encoding/json"
-	"errors"
+	// "errors"
 	"fmt"
 	"io"
 	"log"
@@ -19,7 +19,6 @@ import (
 	"pcfs/particle"
 )
 
-var particleToken string
 var myDB *sql.DB
 var taskLimit = 10
 
@@ -121,7 +120,7 @@ func GetReadyTasks(myDB *sql.DB, id, limit int, scheduledTime time.Time) ([]int,
 }
 
 // TODO make backgroundTask sleep when there are no tasks, wake by new task post?
-func backgroundTask() {
+func backgroundTask(particle *particle.Particle) {
 	var sem = make(chan int, 3)
 	lastTaskId := 0
 	for true {
@@ -146,7 +145,7 @@ func backgroundTask() {
 		for _, taskId := range taskIds {
 			sem <- 1
 			go func(id int) {
-				processTask(id)
+				processTask(particle, id)
 				<-sem
 			}(taskId)
 		}
@@ -154,7 +153,7 @@ func backgroundTask() {
 }
 
 // TODO: Update the schedule time of the task if its been recently pinged and offline, ping fails or device is offile
-func processTask(id int) {
+func processTask(particle *particle.Particle, id int) {
 	log.Println("processTask: process task ", id)
 	task, err := db.SelectTask(myDB, id)
 	if err != nil {
@@ -169,7 +168,7 @@ func processTask(id int) {
 			return
 		}
 		log.Printf("processTask: pinging som %s\n", task.Som.SomId)
-		online, err := particle.Ping(task.Som.SomId, task.Som.ProductId, particleToken)
+		online, err := particle.Ping(task.Som.SomId, task.Som.ProductId)
 		now := sql.NullTime{Time: time.Now(), Valid: true}
 		if err != nil {
 			log.Println("processTask:", err)
@@ -199,7 +198,7 @@ func processTask(id int) {
 	log.Printf("processTask: som %s is online\n", task.Som.SomId)
 	// TODO: may want to get return value from function
 	// TODO: may want to add some way to store error history in the database
-	success, err := particle.CloudFunction(task.Som.SomId, task.Som.ProductId, task.CloudFunction, task.Argument, particleToken, task.DesiredReturnCode)
+	success, err := particle.CloudFunction(task.Som.SomId, task.Som.ProductId, task.CloudFunction, task.Argument, task.DesiredReturnCode)
 	fiveMinLater := time.Now().Add(5 * time.Minute)
 	if err != nil {
 		log.Println("processTask:", err)
@@ -351,6 +350,22 @@ func CloseDB() {
 	myDB.Close()
 }
 
+func addRoutes(
+	mux                 *http.ServeMux,
+) {
+	mux.HandleFunc("GET /{$}", getRoot)
+	mux.HandleFunc("POST /api/tasks", createTaskHandler)
+	mux.HandleFunc("GET /api/tasks/{id}", getTaskHandler)
+}
+
+func NewServer() http.Handler {
+	mux := http.NewServeMux()
+	addRoutes(mux)
+	var handler http.Handler = mux
+    handler = middleware.Logging(mux)
+	return handler
+}
+
 func main() {
 	fmt.Printf("Hello\n")
 	var err error
@@ -361,18 +376,14 @@ func main() {
 	}
 
 	// TODO: Test the token
-	particleToken = os.Getenv("PARTICLE_TOKEN")
+    particleToken := os.Getenv("PARTICLE_TOKEN")
 	if particleToken == "" {
 		log.Fatalf("main: missing PARTICLE_TOKEN in .env file")
 	}
-    tokenValid, err := particle.TestToken(particleToken)
+    particle, err := particle.NewParticle(particleToken)
     if err != nil {
         log.Fatalf("main: %+v", err)
     }
-    if !tokenValid {
-        log.Fatalf("main: particle token is not valid")
-    }
-
 
 	err = SetupDB("my.db3")
 	if err != nil {
@@ -380,18 +391,18 @@ func main() {
 	}
 	defer myDB.Close()
 
-	go backgroundTask()
+    // TODO: add background task to the server
+	go backgroundTask(particle)
 
-	router := http.NewServeMux()
-	router.HandleFunc("GET /{$}", getRoot)
-	router.HandleFunc("POST /api/tasks", createTaskHandler)
-	router.HandleFunc("GET /api/tasks/{id}", getTaskHandler)
+    srv := NewServer()
+    httpServer := &http.Server{
+        // Addr:    net.JoinHostPort(config.Host, config.Port),
+        Addr:    ":8080",
+        Handler: srv,
+    }
 
-	err = http.ListenAndServe(":8080", middleware.Logging(router))
-	if errors.Is(err, http.ErrServerClosed) {
-		log.Printf("server closed\n")
-	} else if err != nil {
-		log.Printf("error starting server: %s\n", err)
-		os.Exit(1)
+    if err := httpServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+		fmt.Fprintf(os.Stderr, "error listening and serving: %s\n", err)
 	}
+    fmt.Println("Goodbye")
 }

@@ -9,12 +9,32 @@ import (
 	"net/url"
 )
 
+type ParticleProvider interface {
+    Ping(somId string, productId int) (bool, error)
+    CloudFunction(somId string, productId int, cloudFunction string, argument string, returnValue sql.NullInt64) (bool, error)
+}
+
+type Particle struct {
+    token string
+}
+
+func NewParticle(token string) (*Particle, error) {
+    valid, err := testToken(token)
+    if err != nil {
+        return nil, err
+    }
+    if !valid {
+        return nil, fmt.Errorf("NewParticle: invalid particle token")
+    }
+    return &Particle{token: token}, nil
+}
+
 // https://docs.particle.io/reference/cloud-apis/api/#errors
 // 408 is not actually used?
 
-func Ping(somId string, productId int, token string) (bool, error) {
+func (p *Particle) Ping(somId string, productId int) (bool, error) {
     queryParams := url.Values{}
-    queryParams.Set("access_token", token)
+    queryParams.Set("access_token", p.token)
 
     url := fmt.Sprintf("https://api.particle.io/v1/products/%d/devices/%s/ping", productId, somId)
     url += "?" + queryParams.Encode()
@@ -56,9 +76,9 @@ func Ping(somId string, productId int, token string) (bool, error) {
     return response.Online, nil
 }
 
-func CloudFunction(somId string, productId int, cloudFunction string, argument string, token string, returnValue sql.NullInt64) (bool, error) {
+func (p *Particle) CloudFunction(somId string, productId int, cloudFunction string, argument string, returnValue sql.NullInt64) (bool, error) {
     params := url.Values{}
-    params.Add("access_token", token)
+    params.Add("access_token", p.token)
     params.Add("arg", argument)
 
     url := fmt.Sprintf("https://api.particle.io/v1/products/%d/devices/%s/%s",
@@ -101,7 +121,7 @@ func CloudFunction(somId string, productId int, cloudFunction string, argument s
 }
 
 // Makes a test request to particle to see if the token is valid, should get a 200 on a list device request
-func TestToken(token string) (bool, error) {
+func testToken(token string) (bool, error) {
     params := url.Values{}
     params.Add("access_token", token)
     url := "https://api.particle.io/v1/devices"
