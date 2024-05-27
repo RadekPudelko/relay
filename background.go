@@ -10,14 +10,14 @@ import(
 )
 
 // TODO make backgroundTask sleep when there are no tasks, wake by new task post?
-func backgroundTask(dbConn *sql.DB, particle particle.ParticleProvider) {
-	var sem = make(chan int, 3)
+func BackgroundTask(config Config, dbConn *sql.DB, particle particle.ParticleProvider) {
+	var sem = make(chan int, config.MaxRoutines)
 	lastTaskId := 0
 	for true {
 		// Get ready tasks, starting from the lastTaskId, limited 1 per som
 		// This implementation does not care about the order of tasks
 		// To take into account order, would first need to get list of soms with ready tasks, then query the min for each
-		taskIds, err := GetReadyTasks(dbConn, lastTaskId, taskLimit, time.Now().UTC())
+        taskIds, err := GetReadyTasks(dbConn, lastTaskId, config.TaskLimit, time.Now().UTC())
 		if err != nil {
 			log.Fatal("backgroundTask: ", err)
 		}
@@ -35,7 +35,7 @@ func backgroundTask(dbConn *sql.DB, particle particle.ParticleProvider) {
 		for _, taskId := range taskIds {
 			sem <- 1
 			go func(id int) {
-				processTask(dbConn, particle, id)
+				processTask(config, dbConn, particle, id)
 				<-sem
 			}(taskId)
 		}
@@ -43,7 +43,7 @@ func backgroundTask(dbConn *sql.DB, particle particle.ParticleProvider) {
 }
 
 // TODO: Update the schedule time of the task if its been recently pinged and offline, ping fails or device is offile
-func processTask(dbConn *sql.DB, particle particle.ParticleProvider, id int) {
+func processTask(config Config, dbConn *sql.DB, particle particle.ParticleProvider, id int) {
 	log.Println("processTask: process task ", id)
 	task, err := db.SelectTask(dbConn, id)
 	if err != nil {
@@ -92,7 +92,7 @@ func processTask(dbConn *sql.DB, particle particle.ParticleProvider, id int) {
 	fiveMinLater := time.Now().Add(5 * time.Minute)
 	if err != nil {
 		log.Println("processTask:", err)
-		if task.Tries == 2 { // Task is considered failed on third attempt
+		if task.Tries == config.MaxRetries {
 			log.Printf("processTask task %d has failed due to exceeding max tries, err %v:\n", id, err)
 			err = db.UpdateTask(dbConn, id, task.ScheduledTime, db.TaskFailed, task.Tries+1)
 		} else {
@@ -135,3 +135,4 @@ func GetReadyTasks(dbConn *sql.DB, id, limit int, scheduledTime time.Time) ([]in
 	// }
 	return taskIds, nil
 }
+

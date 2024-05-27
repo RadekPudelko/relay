@@ -6,16 +6,59 @@ import (
 	"log"
 	"net/http"
 	"os"
+    "net"
 
 	"github.com/joho/godotenv"
 	"pcfs/db"
 	"pcfs/particle"
 )
 
-var taskLimit = 10
+func main() {
+	fmt.Printf("Hello\n")
+    err := run()
+    if err != nil {
+		log.Fatal("main: %w", err)
+    }
+}
+
+func run() error {
+    config := Config{
+        Host: "localhost",
+        Port: "8080",
+        MaxRoutines: 2,
+        TaskLimit: 10,
+        MaxRetries: 3,
+    }
+
+    err := godotenv.Load(".env")
+	if err != nil {
+		log.Fatalf("run: Error loading .env file: %v", err)
+	}
+
+    particleToken := os.Getenv("PARTICLE_TOKEN")
+	if particleToken == "" {
+		log.Fatalf("run: missing PARTICLE_TOKEN in .env file")
+	}
+    particle, err := particle.NewParticle(particleToken)
+    if err != nil {
+        log.Fatalf("run: %+v", err)
+    }
+
+    dbPath := os.Getenv("DB")
+	if particleToken == "" {
+		log.Fatalf("run: missing PARTICLE_TOKEN in .env file")
+	}
+    dbConn, err := SetupDB(dbPath)
+	if err != nil {
+		log.Fatal("run: %w", err)
+	}
+	defer dbConn.Close()
+
+    err = Run(config, dbConn, particle)
+    return nil
+}
 
 func SetupDB(path string) (*sql.DB, error) {
-	var err error
     dbConn, err := db.Connect(path)
 	if err != nil {
 		return nil, fmt.Errorf("SetupDB: %w", err)
@@ -29,14 +72,17 @@ func SetupDB(path string) (*sql.DB, error) {
 	return dbConn, nil
 }
 
-func run(dbConn *sql.DB, particle1 particle.ParticleProvider) (error) {
-    // TODO: add background task to the server
-	go backgroundTask(dbConn, particle1)
+func Run(
+    config Config,
+    dbConn *sql.DB,
+    particle particle.ParticleProvider,
+) error {
+
+	go BackgroundTask(config, dbConn, particle)
 
     srv := NewServer(dbConn)
     httpServer := &http.Server{
-        // Addr:    net.JoinHostPort(config.Host, config.Port),
-        Addr:    ":8080",
+        Addr:    net.JoinHostPort(config.Host, config.Port),
         Handler: srv,
     }
 
@@ -45,36 +91,5 @@ func run(dbConn *sql.DB, particle1 particle.ParticleProvider) (error) {
         return err
 	}
     return nil
-}
-
-func main() {
-	fmt.Printf("Hello\n")
-	var err error
-
-	err = godotenv.Load(".env")
-	if err != nil {
-		log.Fatalf("main: Error loading .env file: %v", err)
-	}
-
-	// TODO: Test the token
-    particleToken := os.Getenv("PARTICLE_TOKEN")
-	if particleToken == "" {
-		log.Fatalf("main: missing PARTICLE_TOKEN in .env file")
-	}
-    particle1, err := particle.NewParticle(particleToken)
-    if err != nil {
-        log.Fatalf("main: %+v", err)
-    }
-
-    dbConn, err := SetupDB("my.db3")
-	if err != nil {
-		log.Fatal("main: %w", err)
-	}
-	defer dbConn.Close()
-
-    err = run(dbConn, particle1)
-    if err != nil {
-		log.Fatal("main: %w", err)
-    }
 }
 
