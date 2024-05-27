@@ -19,7 +19,7 @@ import (
 	"pcfs/particle"
 )
 
-var myDB *sql.DB
+// var dbConn *sql.DB
 var taskLimit = 10
 
 type CreateTaskRequest struct {
@@ -101,8 +101,8 @@ func CreateTask(dbConn *sql.DB, somId string, productId int, cloudFunction strin
 }
 
 // Queries for upto limit tasks in the db that are scheduled after scheduled time from id to id - 1 (inclusive)
-func GetReadyTasks(myDB *sql.DB, id, limit int, scheduledTime time.Time) ([]int, error) {
-	taskIds, err := db.SelectTaskIds(myDB, db.TaskReady, &id, nil, &limit, scheduledTime)
+func GetReadyTasks(dbConn *sql.DB, id, limit int, scheduledTime time.Time) ([]int, error) {
+	taskIds, err := db.SelectTaskIds(dbConn, db.TaskReady, &id, nil, &limit, scheduledTime)
 	if err != nil {
 		return nil, fmt.Errorf("GetReadyTasks for %d onward: %w", id+1, err)
 	}
@@ -110,7 +110,7 @@ func GetReadyTasks(myDB *sql.DB, id, limit int, scheduledTime time.Time) ([]int,
 	// if len(taskIds) < limit && id > 1 {
 	// 	end := id - 1
 	// 	limit := limit - len(taskIds)
-	// 	taskIds2, err := db.SelectTaskIds(myDB, db.TaskReady, nil, &end, &limit, scheduledTime)
+	// 	taskIds2, err := db.SelectTaskIds(dbConn, db.TaskReady, nil, &end, &limit, scheduledTime)
 	// 	if err != nil {
 	// 		return nil, fmt.Errorf("GetReadyTasks for 1 to %d: %w", id-1, err)
 	// 	}
@@ -120,19 +120,19 @@ func GetReadyTasks(myDB *sql.DB, id, limit int, scheduledTime time.Time) ([]int,
 }
 
 // TODO make backgroundTask sleep when there are no tasks, wake by new task post?
-func backgroundTask(particle *particle.Particle) {
+func backgroundTask(dbConn *sql.DB, particle particle.ParticleProvider) {
 	var sem = make(chan int, 3)
 	lastTaskId := 0
 	for true {
 		// Get ready tasks, starting from the lastTaskId, limited 1 per som
 		// This implementation does not care about the order of tasks
 		// To take into account order, would first need to get list of soms with ready tasks, then query the min for each
-		taskIds, err := GetReadyTasks(myDB, lastTaskId, taskLimit, time.Now().UTC())
+		taskIds, err := GetReadyTasks(dbConn, lastTaskId, taskLimit, time.Now().UTC())
 		if err != nil {
 			log.Fatal("backgroundTask: ", err)
 		}
 
-		log.Printf("Loading %d ready tasks ids from the myDB\n", len(taskIds))
+		log.Printf("Loading %d ready tasks ids from the dbConn\n", len(taskIds))
 		if len(taskIds) == 0 {
 			lastTaskId = 0
 			time.Sleep(2 * time.Second)
@@ -145,7 +145,7 @@ func backgroundTask(particle *particle.Particle) {
 		for _, taskId := range taskIds {
 			sem <- 1
 			go func(id int) {
-				processTask(particle, id)
+				processTask(dbConn, particle, id)
 				<-sem
 			}(taskId)
 		}
@@ -153,9 +153,9 @@ func backgroundTask(particle *particle.Particle) {
 }
 
 // TODO: Update the schedule time of the task if its been recently pinged and offline, ping fails or device is offile
-func processTask(particle *particle.Particle, id int) {
+func processTask(dbConn *sql.DB, particle particle.ParticleProvider, id int) {
 	log.Println("processTask: process task ", id)
-	task, err := db.SelectTask(myDB, id)
+	task, err := db.SelectTask(dbConn, id)
 	if err != nil {
 		log.Println("processTask:", err)
 		return
@@ -172,7 +172,7 @@ func processTask(particle *particle.Particle, id int) {
 		now := sql.NullTime{Time: time.Now(), Valid: true}
 		if err != nil {
 			log.Println("processTask:", err)
-			err = db.UpdateSom(myDB, task.Som.Id, task.Som.ProductId, task.Som.LastOnline, now)
+			err = db.UpdateSom(dbConn, task.Som.Id, task.Som.ProductId, task.Som.LastOnline, now)
 			if err != nil {
 				log.Println("processTask: ", err)
 			}
@@ -180,14 +180,14 @@ func processTask(particle *particle.Particle, id int) {
 		}
 		if !online {
 			log.Printf("processTask: som %s is offline\n", task.Som.SomId)
-			err = db.UpdateSom(myDB, task.Som.Id, task.Som.ProductId, task.Som.LastOnline, now)
+			err = db.UpdateSom(dbConn, task.Som.Id, task.Som.ProductId, task.Som.LastOnline, now)
 			// TODO: This and many places like this should never fail, so should the server crash here??
 			if err != nil {
 				log.Println("processTask: ", err)
 			}
 			return
 		}
-		err = db.UpdateSom(myDB, task.Som.Id, task.Som.ProductId, now, now)
+		err = db.UpdateSom(dbConn, task.Som.Id, task.Som.ProductId, now, now)
 		if err != nil {
 			log.Println("processTask:", err)
 			return
@@ -204,9 +204,9 @@ func processTask(particle *particle.Particle, id int) {
 		log.Println("processTask:", err)
 		if task.Tries == 2 { // Task is considered failed on third attempt
 			log.Printf("processTask task %d has failed due to exceeding max tries, err %v:\n", id, err)
-			err = db.UpdateTask(myDB, id, task.ScheduledTime, db.TaskFailed, task.Tries+1)
+			err = db.UpdateTask(dbConn, id, task.ScheduledTime, db.TaskFailed, task.Tries+1)
 		} else {
-			err = db.UpdateTask(myDB, id, fiveMinLater, db.TaskReady, task.Tries+1)
+			err = db.UpdateTask(dbConn, id, fiveMinLater, db.TaskReady, task.Tries+1)
 		}
 		if err != nil {
 			log.Println("processTask:", err)
@@ -216,17 +216,17 @@ func processTask(particle *particle.Particle, id int) {
 	}
 	if !success {
 		log.Printf("processTask task %d has failed due to mismatch in returned code\n", id)
-		err = db.UpdateTask(myDB, id, task.ScheduledTime, db.TaskFailed, task.Tries+1)
+		err = db.UpdateTask(dbConn, id, task.ScheduledTime, db.TaskFailed, task.Tries+1)
 	} else {
 		log.Printf("processTask: task %d, success\n", id)
-		err = db.UpdateTask(myDB, id, task.ScheduledTime, db.TaskComplete, task.Tries+1)
+		err = db.UpdateTask(dbConn, id, task.ScheduledTime, db.TaskComplete, task.Tries+1)
 	}
 	if err != nil {
 		log.Println("processTask:", err)
 	}
 }
 
-func getTaskHandler(w http.ResponseWriter, r *http.Request) {
+func getTaskHandler(dbConn *sql.DB, w http.ResponseWriter, r *http.Request) {
 	taskIdStr := r.PathValue("id")
 
 	if taskIdStr == "" {
@@ -244,7 +244,7 @@ func getTaskHandler(w http.ResponseWriter, r *http.Request) {
 
 	log.Printf("getTaskHandler: request for task %d\n", taskId)
 
-	task, err := db.SelectTask(myDB, taskId)
+	task, err := db.SelectTask(dbConn, taskId)
 	if err != nil {
 		log.Println("getTaskHandler: ", err)
 		http.Error(w, "Error in getting task", http.StatusInternalServerError)
@@ -271,7 +271,7 @@ func getTaskHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 // TODO: Want to add some sort of id to these logs so that I can know whats going on if there are multiple requests at once
-func createTaskHandler(w http.ResponseWriter, r *http.Request) {
+func createTaskHandler(dbConn *sql.DB, w http.ResponseWriter, r *http.Request) {
 	body, err := io.ReadAll(r.Body)
 	if err != nil {
 		log.Println("createTaskHandler: io.ReadAll:", err)
@@ -313,7 +313,7 @@ func createTaskHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// TODO: I dont think the product id is strictly required, maybe I drop it
-	taskId, err := CreateTask(myDB, req.SomId, req.ProductId, req.CloudFunction, argument, desiredReturnCode, scheduledTime)
+	taskId, err := CreateTask(dbConn, req.SomId, req.ProductId, req.CloudFunction, argument, desiredReturnCode, scheduledTime)
 	if err != nil {
 		log.Println("createTaskHandler:", err.Error())
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -331,39 +331,77 @@ func getRoot(w http.ResponseWriter, r *http.Request) {
 	io.WriteString(w, "Hello, HTTP!\n")
 }
 
-func SetupDB(path string) error {
+func SetupDB(path string) (*sql.DB, error) {
 	var err error
-	myDB, err = db.Connect(path)
+    dbConn, err := db.Connect(path)
 	if err != nil {
-		return fmt.Errorf("SetupDB: %w", err)
+		return nil, fmt.Errorf("SetupDB: %w", err)
 	}
 
-	err = db.CreateTables(myDB)
+	err = db.CreateTables(dbConn)
 	if err != nil {
-		myDB.Close()
-		return fmt.Errorf("SetupDB: %w", err)
+		dbConn.Close()
+		return nil, fmt.Errorf("SetupDB: %w", err)
 	}
-	return nil
+	return dbConn, nil
 }
 
-func CloseDB() {
-	myDB.Close()
+func handleGetRoot() http.Handler {
+	return http.HandlerFunc(
+		func(w http.ResponseWriter, r *http.Request) {
+            getRoot(w, r)
+		},
+	)
+}
+
+func handleCreateTask(dbConn *sql.DB) http.Handler {
+	return http.HandlerFunc(
+		func(w http.ResponseWriter, r *http.Request) {
+            createTaskHandler(dbConn, w, r)
+            getRoot(w, r)
+		},
+	)
+}
+
+func handleGetTask(dbConn *sql.DB) http.Handler {
+	return http.HandlerFunc(
+		func(w http.ResponseWriter, r *http.Request) {
+            getTaskHandler(dbConn, w, r)
+		},
+	)
 }
 
 func addRoutes(
 	mux                 *http.ServeMux,
+    dbConn *sql.DB,
 ) {
-	mux.HandleFunc("GET /{$}", getRoot)
-	mux.HandleFunc("POST /api/tasks", createTaskHandler)
-	mux.HandleFunc("GET /api/tasks/{id}", getTaskHandler)
+	mux.Handle("GET /{$}", handleGetRoot())
+    mux.Handle("POST /api/tasks", handleCreateTask(dbConn))
+	mux.Handle("GET /api/tasks/{id}", handleGetTask(dbConn))
 }
 
-func NewServer() http.Handler {
+func NewServer(dbConn *sql.DB) http.Handler {
 	mux := http.NewServeMux()
-	addRoutes(mux)
+	addRoutes(mux, dbConn)
 	var handler http.Handler = mux
     handler = middleware.Logging(mux)
 	return handler
+}
+
+func run(dbConn *sql.DB, particle1 particle.ParticleProvider) {
+    // TODO: add background task to the server
+	go backgroundTask(dbConn, particle1)
+
+    srv := NewServer(dbConn)
+    httpServer := &http.Server{
+        // Addr:    net.JoinHostPort(config.Host, config.Port),
+        Addr:    ":8080",
+        Handler: srv,
+    }
+
+    if err := httpServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+		fmt.Fprintf(os.Stderr, "error listening and serving: %s\n", err)
+	}
 }
 
 func main() {
@@ -380,29 +418,15 @@ func main() {
 	if particleToken == "" {
 		log.Fatalf("main: missing PARTICLE_TOKEN in .env file")
 	}
-    particle, err := particle.NewParticle(particleToken)
+    particle1, err := particle.NewParticle(particleToken)
     if err != nil {
         log.Fatalf("main: %+v", err)
     }
 
-	err = SetupDB("my.db3")
+    dbConn, err := SetupDB("my.db3")
 	if err != nil {
 		log.Fatal("main: %w", err)
 	}
-	defer myDB.Close()
-
-    // TODO: add background task to the server
-	go backgroundTask(particle)
-
-    srv := NewServer()
-    httpServer := &http.Server{
-        // Addr:    net.JoinHostPort(config.Host, config.Port),
-        Addr:    ":8080",
-        Handler: srv,
-    }
-
-    if err := httpServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-		fmt.Fprintf(os.Stderr, "error listening and serving: %s\n", err)
-	}
-    fmt.Println("Goodbye")
+	defer dbConn.Close()
+    run(dbConn, particle1)
 }

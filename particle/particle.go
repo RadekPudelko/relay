@@ -32,7 +32,7 @@ func NewParticle(token string) (*Particle, error) {
 // https://docs.particle.io/reference/cloud-apis/api/#errors
 // 408 is not actually used?
 
-func (p *Particle) Ping(somId string, productId int) (bool, error) {
+func (p Particle) Ping(somId string, productId int) (bool, error) {
     queryParams := url.Values{}
     queryParams.Set("access_token", p.token)
 
@@ -76,7 +76,7 @@ func (p *Particle) Ping(somId string, productId int) (bool, error) {
     return response.Online, nil
 }
 
-func (p *Particle) CloudFunction(somId string, productId int, cloudFunction string, argument string, returnValue sql.NullInt64) (bool, error) {
+func (p Particle) CloudFunction(somId string, productId int, cloudFunction string, argument string, returnValue sql.NullInt64) (bool, error) {
     params := url.Values{}
     params.Add("access_token", p.token)
     params.Add("arg", argument)
