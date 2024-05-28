@@ -121,4 +121,3 @@ func InsertOrUpdateSom(db *sql.DB, somId string, productId int) (int, error) {
 	}
 	return InsertSom(db, somId, productId)
 }
-

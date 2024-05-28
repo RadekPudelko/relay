@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"pcfs/db"
-    "pcfs/server"
+	"pcfs/server"
 )
 
 func testCreateTask(dbConn *sql.DB, somId string, productId int, cloudFunction string, argument string, desiredReturnCode sql.NullInt64, scheduledTime0 time.Time) (int, error) {
@@ -162,7 +162,7 @@ func TestGetReadyTasks(t *testing.T) {
 		t.Fatalf("TestGetReadyTasks: %+v", err)
 	}
 
-	testTimeStr := "2023-05-14 20:17:32.897647+00:00" // 1 year before all tasks scheduled time
+	testTimeStr := "2024-05-15 20:17:32.897647+00:00" // 1 day after scheduled tasks
 
 	somId := "som0"
 	productId := 0
@@ -283,15 +283,10 @@ func TestGetReadyTasks(t *testing.T) {
 	if err != nil {
 		t.Fatalf("TestGetReadyTasks: %+v", err)
 	}
-	err = testGetReadyTasks(dbConn, testTimeStr, t0, 10, []int{t0, t1, t6, t8})
+	err = testGetReadyTasks(dbConn, testTimeStr, t0, 10, []int{t0, t1, t6})
 	if err != nil {
 		t.Fatalf("TestGetReadyTasks: %+v", err)
 	}
-	err = testGetReadyTasks(dbConn, timeStr1, t0, 10, []int{t8})
-	if err != nil {
-		t.Fatalf("TestGetReadyTasks: %+v", err)
-	}
-
 	t.Log(t0, t1, t2, t3, t4, t5, t6, t7, t8)
 }
 

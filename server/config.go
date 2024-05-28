@@ -7,4 +7,3 @@ type Config struct {
 	TaskLimit   int
 	MaxRetries  int
 }
-

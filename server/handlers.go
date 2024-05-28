@@ -25,7 +25,6 @@ func HandleCreateTask(dbConn *sql.DB) http.Handler {
 	return http.HandlerFunc(
 		func(w http.ResponseWriter, r *http.Request) {
 			createTaskHandler(dbConn, w, r)
-			getRoot(w, r)
 		},
 	)
 }
@@ -38,6 +37,7 @@ func HandleGetTask(dbConn *sql.DB) http.Handler {
 	)
 }
 
+// TODO: Rename this to something w/o verb
 type CreateTaskRequest struct {
 	SomId             string  `json:"som_id"`
 	ProductId         int     `json:"product_id"`
@@ -113,6 +113,7 @@ func createTaskHandler(dbConn *sql.DB, w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
+    // TODO: Send json?
 	io.WriteString(w, fmt.Sprintf("%d", taskId))
 }
 

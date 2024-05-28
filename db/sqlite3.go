@@ -12,11 +12,10 @@ func Connect(path string) (*sql.DB, error) {
 	if err != nil {
 		return nil, fmt.Errorf("ConnectToDB: sql.Open: %w", err)
 	}
-    err = db.Ping()
-    if err != nil {
-        db.Close()
+	err = db.Ping()
+	if err != nil {
+		db.Close()
 		return nil, fmt.Errorf("ConnectToDB: db.Ping: %w", err)
-    }
+	}
 	return db, nil
 }
-

@@ -4,7 +4,7 @@ import (
 	"database/sql"
 	"fmt"
 
-    _ "github.com/mattn/go-sqlite3"
+	_ "github.com/mattn/go-sqlite3"
 )
 
 func CreateTables(db *sql.DB) error {
@@ -55,4 +55,3 @@ func CreateTasksTable(db *sql.DB) error {
 	}
 	return nil
 }
-
