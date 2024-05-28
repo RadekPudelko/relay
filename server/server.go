@@ -1,4 +1,4 @@
-package main
+package server
 
 import (
 	"database/sql"
@@ -14,3 +14,4 @@ func NewServer(dbConn *sql.DB) http.Handler {
 	handler = middleware.Logging(mux)
 	return handler
 }
+

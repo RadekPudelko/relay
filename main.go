@@ -11,6 +11,7 @@ import (
 	"github.com/joho/godotenv"
 	"pcfs/db"
 	"pcfs/particle"
+	"pcfs/server"
 )
 
 func main() {
@@ -22,7 +23,7 @@ func main() {
 }
 
 func run() error {
-	config := Config{
+	config := server.Config{
 		Host:        "localhost",
 		Port:        "8080",
 		MaxRoutines: 2,
@@ -58,6 +59,7 @@ func run() error {
 	return nil
 }
 
+// TODO: move this somewhere else
 func SetupDB(path string) (*sql.DB, error) {
 	dbConn, err := db.Connect(path)
 	if err != nil {
@@ -73,14 +75,14 @@ func SetupDB(path string) (*sql.DB, error) {
 }
 
 func Run(
-	config Config,
+	config server.Config,
 	dbConn *sql.DB,
-	particle particle.ParticleProvider,
+	particle particle.ParticleAPI,
 ) error {
 
-	go BackgroundTask(config, dbConn, particle)
+	go server.BackgroundTask(config, dbConn, particle)
 
-	srv := NewServer(dbConn)
+	srv := server.NewServer(dbConn)
 	httpServer := &http.Server{
 		Addr:    net.JoinHostPort(config.Host, config.Port),
 		Handler: srv,
@@ -92,3 +94,4 @@ func Run(
 	}
 	return nil
 }
+

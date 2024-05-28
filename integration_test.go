@@ -1,55 +1,36 @@
 package main
 
 import (
-	"database/sql"
 	"testing"
-	"time"
+    "net/http"
+    "io"
 
-	"pcfs/db"
+	// "pcfs/db"
+	// "pcfs/particle"
+	// "pcfs/server"
 )
 
 func TestIntegration(t *testing.T) {
-	dbConn, err := db.Connect("file::memory:?cache=shared")
-	if err != nil {
-		t.Fatalf("TestCreateTasks: %+v", err)
-	}
-	defer dbConn.Close()
+    t.Log("TestIntegration")
+    go func() {
+        err := runTestServer()
+        if err != nil {
+            // TODO: Fix this warning
+            t.Fatalf("TestIntegration: %+v", err)
+        }
+    }()
 
-	err = db.CreateTables(dbConn)
-	if err != nil {
-		t.Fatalf("TestCreateTasks: %+v", err)
-	}
+    res, err := http.Get("http://localhost:8080/")
+    if err != nil {
+        t.Fatalf("TestIntegration: http.Get: %+v", err)
+    }
+    defer res.Body.Close()
 
-	somId := "somid0"
-	productId := 0
-	cloudFunction := "func1"
-	argument := ""
-	desiredReturnCode := sql.NullInt64{Int64: 0, Valid: false}
-	scheduledTime0 := time.Now().UTC()
+    out, err := io.ReadAll(res.Body)
+    if err != nil {
+        t.Fatalf("TestIntegration: io.ReadAll: %+v", err)
+    }
+    t.Logf("TestIntegration: response from server: %s\n", string(out))
 
-	tid, err := testCreateTask(dbConn, somId, productId, cloudFunction, argument, desiredReturnCode, scheduledTime0)
-	if err != nil {
-		t.Fatalf("TestCreateTasks: %+v", err)
-	}
-	if tid != 1 {
-		t.Fatalf("TestCreateTasks: expected to create task id 1, got %d", tid)
-	}
-
-	somId = "somid1"
-	tid, err = testCreateTask(dbConn, somId, productId, cloudFunction, argument, desiredReturnCode, scheduledTime0)
-	if err != nil {
-		t.Fatalf("TestCreateTasks: %+v", err)
-	}
-	if tid != 2 {
-		t.Fatalf("TestCreateTasks: expected to create task id 2, got %d", tid)
-	}
-
-	desiredReturnCode = sql.NullInt64{Int64: 0, Valid: true}
-	tid, err = testCreateTask(dbConn, somId, productId, cloudFunction, argument, desiredReturnCode, scheduledTime0)
-	if err != nil {
-		t.Fatalf("TestCreateTasks: %+v", err)
-	}
-	if tid != 3 {
-		t.Fatalf("TestCreateTasks: expected to create task id 3, got %d", tid)
-	}
 }
+

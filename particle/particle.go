@@ -9,7 +9,7 @@ import (
 	"net/url"
 )
 
-type ParticleProvider interface {
+type ParticleAPI interface {
     Ping(somId string, productId int) (bool, error)
     CloudFunction(somId string, productId int, cloudFunction string, argument string, returnValue sql.NullInt64) (bool, error)
 }

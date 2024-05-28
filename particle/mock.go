@@ -7,11 +7,11 @@ import (
 
 type MockParticle struct {}
 
-func New() (*MockParticle, error) {
-    return &MockParticle{}, nil
+func NewMock() (MockParticle) {
+    return MockParticle{}
 }
 
-func (p *MockParticle) Ping(somId string, productId int) (bool, error) {
+func (p MockParticle) Ping(somId string, productId int) (bool, error) {
     // TODO: add latency
     switch somId {
     case "error":
@@ -23,7 +23,7 @@ func (p *MockParticle) Ping(somId string, productId int) (bool, error) {
     }
 }
 
-func (p *MockParticle) CloudFunction(somId string, productId int, cloudFunction string, argument string, returnValue sql.NullInt64) (bool, error) {
+func (p MockParticle) CloudFunction(somId string, productId int, cloudFunction string, argument string, returnValue sql.NullInt64) (bool, error) {
     // TODO: add latency
     switch somId {
     case "error":

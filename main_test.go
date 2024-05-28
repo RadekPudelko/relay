@@ -1,15 +1,6 @@
 package main
 
 import (
-	// "bytes"
-	// "net/http"
-	// "net/http/httptest"
-	// "net/url"
-	// "encoding/csv"
-	// "encoding/json"
-	// "fmt"
-	// "strconv"
-
 	"database/sql"
 	"fmt"
 	"os"
@@ -17,10 +8,11 @@ import (
 	"time"
 
 	"pcfs/db"
+    "pcfs/server"
 )
 
 func testCreateTask(dbConn *sql.DB, somId string, productId int, cloudFunction string, argument string, desiredReturnCode sql.NullInt64, scheduledTime0 time.Time) (int, error) {
-	id, err := CreateTask(dbConn, somId, productId, cloudFunction, argument, desiredReturnCode, scheduledTime0)
+	id, err := server.CreateTask(dbConn, somId, productId, cloudFunction, argument, desiredReturnCode, scheduledTime0)
 	if err != nil {
 		return 0, fmt.Errorf("testCreateTask: %w", err)
 	}
@@ -137,7 +129,7 @@ func testGetReadyTasks(dbConn *sql.DB, searchTime string, startId, limit int, ex
 		return fmt.Errorf("testGetReadyTasks: time.Parse %w on %s", err, searchTime)
 	}
 	testScheduledTime = testScheduledTime.UTC()
-	tasks, err := GetReadyTasks(dbConn, startId, limit, testScheduledTime)
+	tasks, err := server.GetReadyTasks(dbConn, startId, limit, testScheduledTime)
 	if err != nil {
 		return fmt.Errorf("testGetReadyTasks: %w", err)
 	}
@@ -302,3 +294,4 @@ func TestGetReadyTasks(t *testing.T) {
 
 	t.Log(t0, t1, t2, t3, t4, t5, t6, t7, t8)
 }
+

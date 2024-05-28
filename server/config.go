@@ -1,4 +1,4 @@
-package main
+package server
 
 type Config struct {
 	Host        string
@@ -7,3 +7,4 @@ type Config struct {
 	TaskLimit   int
 	MaxRetries  int
 }
+

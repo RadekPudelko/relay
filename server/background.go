@@ -1,4 +1,4 @@
-package main
+package server
 
 import (
 	"database/sql"
@@ -11,7 +11,7 @@ import (
 )
 
 // TODO make backgroundTask sleep when there are no tasks, wake by new task post?
-func BackgroundTask(config Config, dbConn *sql.DB, particle particle.ParticleProvider) {
+func BackgroundTask(config Config, dbConn *sql.DB, particle particle.ParticleAPI) {
 	var sem = make(chan int, config.MaxRoutines)
 	lastTaskId := 0
 	for true {
@@ -44,7 +44,7 @@ func BackgroundTask(config Config, dbConn *sql.DB, particle particle.ParticlePro
 }
 
 // TODO: Update the schedule time of the task if its been recently pinged and offline, ping fails or device is offile
-func processTask(config Config, dbConn *sql.DB, particle particle.ParticleProvider, id int) {
+func processTask(config Config, dbConn *sql.DB, particle particle.ParticleAPI, id int) {
 	log.Println("processTask: process task ", id)
 	task, err := db.SelectTask(dbConn, id)
 	if err != nil {
