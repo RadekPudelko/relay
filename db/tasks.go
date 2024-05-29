@@ -122,8 +122,8 @@ func SelectTaskIds(db *sql.DB, status TaskStatus, startId, endId, limit *int, sc
 	}
 
 	// TODO: figure out how to pretty print these dynamic queries
-	fmt.Println(query)
-	fmt.Println(params)
+	// fmt.Println(query)
+	// fmt.Println(params)
 
 	stmt, err := db.Prepare(query)
 	if err != nil {
