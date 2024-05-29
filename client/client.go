@@ -60,10 +60,9 @@ func (c Client) GetTask(id int) (*db.Task, error) {
 	return &task, nil
 }
 
-func (c Client) CreateTask(somId string, productId int, cloudFunction string, argument string, desiredReturnCode *int, scheduledTime *time.Time) (int, error) {
+func (c Client) CreateTask(somId string, cloudFunction string, argument string, desiredReturnCode *int, scheduledTime *time.Time) (int, error) {
     data := server.CreateTaskRequest{
         SomId: somId,
-        ProductId: productId,
         CloudFunction: cloudFunction,
         Argument: &argument,
         DesiredReturnCode: desiredReturnCode,

@@ -10,12 +10,9 @@ import (
 	// "pcfs/particle"
 )
 
-func assertTask(task *db.Task, somId string, productId int, cloudFunction string, argument string, desiredReturnCode *int, scheduledTime *time.Time) (error) {
+func assertTask(task *db.Task, somId string, cloudFunction string, argument string, desiredReturnCode *int, scheduledTime *time.Time) (error) {
     if task.Som.SomId != somId {
         return fmt.Errorf("assertTask: somId, expected=%s, got=%s", somId, task.Som.SomId)
-    }
-    if task.Som.ProductId != productId {
-        return fmt.Errorf("assertTask: productId, expected=%d, got=%d", productId, task.Som.ProductId)
     }
     if task.CloudFunction != cloudFunction {
         return fmt.Errorf("assertTask: cloudFunction, expected=%s, got=%s", cloudFunction, task.CloudFunction)
@@ -61,13 +58,12 @@ func TestIntegration(t *testing.T) {
     }
 
     somId := "som0"
-    productId := 123
     cloudFunction := "func0"
     argument := ""
     var desiredReturnCode *int = nil
     var scheduledTime *time.Time = nil
 
-    id, err := client.CreateTask(somId, productId, cloudFunction, argument, desiredReturnCode, scheduledTime)
+    id, err := client.CreateTask(somId, cloudFunction, argument, desiredReturnCode, scheduledTime)
     if err != nil {
 		t.Fatalf("TestIntegration: %+v", err)
     }
@@ -79,7 +75,7 @@ func TestIntegration(t *testing.T) {
         t.Fatalf("TestIntegration: %+v for id=%d", err, id)
     }
 
-    err = assertTask(task, somId, productId, cloudFunction, argument, desiredReturnCode, scheduledTime)
+    err = assertTask(task, somId, cloudFunction, argument, desiredReturnCode, scheduledTime)
     if err != nil {
         t.Fatalf("TestIntegration: %+v", err)
     }

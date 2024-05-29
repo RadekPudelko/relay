@@ -59,11 +59,11 @@ func processTask(config Config, dbConn *sql.DB, particle particle.ParticleAPI, i
 			return
 		}
 		log.Printf("processTask: pinging som %s\n", task.Som.SomId)
-		online, err := particle.Ping(task.Som.SomId, task.Som.ProductId)
+		online, err := particle.Ping(task.Som.SomId)
 		now := sql.NullTime{Time: time.Now(), Valid: true}
 		if err != nil {
 			log.Println("processTask:", err)
-			err = db.UpdateSom(dbConn, task.Som.Id, task.Som.ProductId, task.Som.LastOnline, now)
+			err = db.UpdateSom(dbConn, task.Som.Id, task.Som.LastOnline, now)
 			if err != nil {
 				log.Println("processTask: ", err)
 			}
@@ -71,14 +71,14 @@ func processTask(config Config, dbConn *sql.DB, particle particle.ParticleAPI, i
 		}
 		if !online {
 			log.Printf("processTask: som %s is offline\n", task.Som.SomId)
-			err = db.UpdateSom(dbConn, task.Som.Id, task.Som.ProductId, task.Som.LastOnline, now)
+			err = db.UpdateSom(dbConn, task.Som.Id, task.Som.LastOnline, now)
 			// TODO: This and many places like this should never fail, so should the server crash here??
 			if err != nil {
 				log.Println("processTask: ", err)
 			}
 			return
 		}
-		err = db.UpdateSom(dbConn, task.Som.Id, task.Som.ProductId, now, now)
+		err = db.UpdateSom(dbConn, task.Som.Id, now, now)
 		if err != nil {
 			log.Println("processTask:", err)
 			return
@@ -89,7 +89,7 @@ func processTask(config Config, dbConn *sql.DB, particle particle.ParticleAPI, i
 	log.Printf("processTask: som %s is online\n", task.Som.SomId)
 	// TODO: may want to get return value from function
 	// TODO: may want to add some way to store error history in the database
-	success, err := particle.CloudFunction(task.Som.SomId, task.Som.ProductId, task.CloudFunction, task.Argument, task.DesiredReturnCode)
+	success, err := particle.CloudFunction(task.Som.SomId, task.CloudFunction, task.Argument, task.DesiredReturnCode)
 	fiveMinLater := time.Now().Add(5 * time.Minute)
 	if err != nil {
 		log.Println("processTask:", err)

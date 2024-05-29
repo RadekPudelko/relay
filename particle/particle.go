@@ -10,8 +10,8 @@ import (
 )
 
 type ParticleAPI interface {
-	Ping(somId string, productId int) (bool, error)
-	CloudFunction(somId string, productId int, cloudFunction string, argument string, returnValue sql.NullInt64) (bool, error)
+	Ping(somId string) (bool, error)
+	CloudFunction(somId string, cloudFunction string, argument string, returnValue sql.NullInt64) (bool, error)
 }
 
 type Particle struct {
@@ -32,11 +32,11 @@ func NewParticle(token string) (*Particle, error) {
 // https://docs.particle.io/reference/cloud-apis/api/#errors
 // 408 is not actually used?
 
-func (p Particle) Ping(somId string, productId int) (bool, error) {
+func (p Particle) Ping(somId string) (bool, error) {
 	queryParams := url.Values{}
 	queryParams.Set("access_token", p.token)
 
-	url := fmt.Sprintf("https://api.particle.io/v1/products/%d/devices/%s/ping", productId, somId)
+	url := fmt.Sprintf("https://api.particle.io/v1/devices/%s/ping", somId)
 	url += "?" + queryParams.Encode()
 
 	req, err := http.NewRequest("PUT", url, nil)
@@ -76,13 +76,12 @@ func (p Particle) Ping(somId string, productId int) (bool, error) {
 	return response.Online, nil
 }
 
-func (p Particle) CloudFunction(somId string, productId int, cloudFunction string, argument string, returnValue sql.NullInt64) (bool, error) {
+func (p Particle) CloudFunction(somId string, cloudFunction string, argument string, returnValue sql.NullInt64) (bool, error) {
 	params := url.Values{}
 	params.Add("access_token", p.token)
 	params.Add("arg", argument)
 
-	url := fmt.Sprintf("https://api.particle.io/v1/products/%d/devices/%s/%s",
-		productId, somId, cloudFunction)
+	url := fmt.Sprintf("https://api.particle.io/v1/devices/%s/%s", somId, cloudFunction)
 
 	// This can block for a long time
 	resp, err := http.PostForm(url, params)
@@ -151,3 +150,4 @@ func testToken(token string) (bool, error) {
 		return false, fmt.Errorf("particle.TestToken: Unexpected response from Particle: %d:, body: %s", resp.StatusCode, string(body))
 	}
 }
+

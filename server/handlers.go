@@ -40,7 +40,6 @@ func HandleGetTask(dbConn *sql.DB) http.Handler {
 // TODO: Rename this to something w/o verb
 type CreateTaskRequest struct {
 	SomId             string  `json:"som_id"`
-	ProductId         int     `json:"product_id"`
 	CloudFunction     string  `json:"cloud_function"`
 	Argument          *string `json:"argument,omitempty"`
 	DesiredReturnCode *int    `json:"desired_return_code,omitempty"`
@@ -49,7 +48,7 @@ type CreateTaskRequest struct {
 }
 
 func (p CreateTaskRequest) String() string {
-	str := fmt.Sprintf("som: %s, product %d, function: %s", p.SomId, p.ProductId, p.CloudFunction)
+	str := fmt.Sprintf("som: %s, function: %s", p.SomId, p.CloudFunction)
 	if p.Argument != nil {
 		str += fmt.Sprintf(", argument: %s", *p.Argument)
 	}
@@ -78,9 +77,9 @@ func createTaskHandler(dbConn *sql.DB, w http.ResponseWriter, r *http.Request) {
 	}
 
 	log.Printf("createTaskHandler: received request body: %s\n", req)
-	if req.SomId == "" || req.ProductId == 0 || req.CloudFunction == "" {
+	if req.SomId == "" || req.CloudFunction == "" {
 		log.Println("createTaskHandler: Atleast one field in the post payload was blank or invalid")
-		http.Error(w, "som_id, product_id and cloud_function are required fields",
+		http.Error(w, "som_id and cloud_function are required fields",
 			http.StatusUnprocessableEntity)
 		return
 	}
@@ -101,8 +100,7 @@ func createTaskHandler(dbConn *sql.DB, w http.ResponseWriter, r *http.Request) {
 		desiredReturnCode = sql.NullInt64{Int64: int64(*req.DesiredReturnCode), Valid: true}
 	}
 
-	// TODO: I dont think the product id is strictly required, maybe I drop it
-	taskId, err := CreateTask(dbConn, req.SomId, req.ProductId, req.CloudFunction, argument, desiredReturnCode, scheduledTime)
+	taskId, err := CreateTask(dbConn, req.SomId, req.CloudFunction, argument, desiredReturnCode, scheduledTime)
 	if err != nil {
 		log.Println("createTaskHandler:", err.Error())
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -165,8 +163,8 @@ func getTaskHandler(dbConn *sql.DB, w http.ResponseWriter, r *http.Request) {
 	w.Write(jsonData)
 }
 
-func CreateTask(dbConn *sql.DB, somId string, productId int, cloudFunction string, argument string, desiredReturnCode sql.NullInt64, scheduledTime time.Time) (int, error) {
-	somKey, err := db.InsertOrUpdateSom(dbConn, somId, productId)
+func CreateTask(dbConn *sql.DB, somId string, cloudFunction string, argument string, desiredReturnCode sql.NullInt64, scheduledTime time.Time) (int, error) {
+	somKey, err := db.InsertOrUpdateSom(dbConn, somId)
 	if err != nil {
 		return 0, fmt.Errorf("createTaskHandler: %w", err)
 	}
@@ -178,3 +176,4 @@ func CreateTask(dbConn *sql.DB, somId string, productId int, cloudFunction strin
 
 	return taskId, nil
 }
+

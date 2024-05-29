@@ -11,8 +11,8 @@ import (
 	"pcfs/server"
 )
 
-func testCreateTask(dbConn *sql.DB, somId string, productId int, cloudFunction string, argument string, desiredReturnCode sql.NullInt64, scheduledTime0 time.Time) (int, error) {
-	id, err := server.CreateTask(dbConn, somId, productId, cloudFunction, argument, desiredReturnCode, scheduledTime0)
+func testCreateTask(dbConn *sql.DB, somId string,  cloudFunction string, argument string, desiredReturnCode sql.NullInt64, scheduledTime0 time.Time) (int, error) {
+	id, err := server.CreateTask(dbConn, somId, cloudFunction, argument, desiredReturnCode, scheduledTime0)
 	if err != nil {
 		return 0, fmt.Errorf("testCreateTask: %w", err)
 	}
@@ -24,9 +24,6 @@ func testCreateTask(dbConn *sql.DB, somId string, productId int, cloudFunction s
 
 	if task.Som.SomId != somId {
 		return 0, fmt.Errorf("testCreateTask: SelectTask on task %d got somId %s, expected %s", id, task.Som.SomId, somId)
-	}
-	if task.Som.ProductId != productId {
-		return 0, fmt.Errorf("testCreateTask: SelectTask on task %d got productId %d, expected %d", id, task.Som.ProductId, productId)
 	}
 	if task.CloudFunction != cloudFunction {
 		return 0, fmt.Errorf("testCreateTask: SelectTask on task %d got cloudFunction %s, expected %s", id, task.CloudFunction, cloudFunction)
@@ -56,13 +53,12 @@ func TestCreateTasks(t *testing.T) {
 	}
 
 	somId := "somid0"
-	productId := 0
 	cloudFunction := "func1"
 	argument := ""
 	desiredReturnCode := sql.NullInt64{Int64: 0, Valid: false}
 	scheduledTime0 := time.Now().UTC()
 
-	tid, err := testCreateTask(dbConn, somId, productId, cloudFunction, argument, desiredReturnCode, scheduledTime0)
+	tid, err := testCreateTask(dbConn, somId, cloudFunction, argument, desiredReturnCode, scheduledTime0)
 	if err != nil {
 		t.Fatalf("TestCreateTasks: %+v", err)
 	}
@@ -71,7 +67,7 @@ func TestCreateTasks(t *testing.T) {
 	}
 
 	somId = "somid1"
-	tid, err = testCreateTask(dbConn, somId, productId, cloudFunction, argument, desiredReturnCode, scheduledTime0)
+	tid, err = testCreateTask(dbConn, somId, cloudFunction, argument, desiredReturnCode, scheduledTime0)
 	if err != nil {
 		t.Fatalf("TestCreateTasks: %+v", err)
 	}
@@ -80,7 +76,7 @@ func TestCreateTasks(t *testing.T) {
 	}
 
 	desiredReturnCode = sql.NullInt64{Int64: 0, Valid: true}
-	tid, err = testCreateTask(dbConn, somId, productId, cloudFunction, argument, desiredReturnCode, scheduledTime0)
+	tid, err = testCreateTask(dbConn, somId,  cloudFunction, argument, desiredReturnCode, scheduledTime0)
 	if err != nil {
 		t.Fatalf("TestCreateTasks: %+v", err)
 	}
@@ -89,7 +85,7 @@ func TestCreateTasks(t *testing.T) {
 	}
 }
 
-func createCustomTask(dbConn *sql.DB, somId string, productId int, cloudFunction, argument string, desiredReturnCode sql.NullInt64, timeStr string, status db.TaskStatus) (int, error) {
+func createCustomTask(dbConn *sql.DB, somId string, cloudFunction, argument string, desiredReturnCode sql.NullInt64, timeStr string, status db.TaskStatus) (int, error) {
 	layout := "2006-01-02 15:04:05.999999-07:00"
 	scheduledTime, err := time.Parse(layout, timeStr)
 	if err != nil {
@@ -97,7 +93,7 @@ func createCustomTask(dbConn *sql.DB, somId string, productId int, cloudFunction
 	}
 	scheduledTime = scheduledTime.UTC()
 
-	tid, err := testCreateTask(dbConn, somId, productId, cloudFunction, argument, desiredReturnCode, scheduledTime)
+	tid, err := testCreateTask(dbConn, somId, cloudFunction, argument, desiredReturnCode, scheduledTime)
 	if err != nil {
 		return 0, fmt.Errorf("createCustomTask: %w", err)
 	}
@@ -165,7 +161,6 @@ func TestGetReadyTasks(t *testing.T) {
 	testTimeStr := "2024-05-15 20:17:32.897647+00:00" // 1 day after scheduled tasks
 
 	somId := "som0"
-	productId := 0
 	cloudFunction := "func0"
 	argument := ""
 	desiredReturnCode := sql.NullInt64{Int64: 0, Valid: false}
@@ -178,7 +173,7 @@ func TestGetReadyTasks(t *testing.T) {
 	}
 
 	// som0
-	t0, err := createCustomTask(dbConn, somId, productId, cloudFunction, argument, desiredReturnCode, timeStr0, db.TaskReady)
+	t0, err := createCustomTask(dbConn, somId, cloudFunction, argument, desiredReturnCode, timeStr0, db.TaskReady)
 	if err != nil {
 		t.Fatalf("TestGetReadyTasks: %+v", err)
 	}
@@ -189,7 +184,7 @@ func TestGetReadyTasks(t *testing.T) {
 
 	// som1
 	somId = "som1"
-	t1, err := createCustomTask(dbConn, somId, productId, cloudFunction, argument, desiredReturnCode, timeStr0, db.TaskReady)
+	t1, err := createCustomTask(dbConn, somId, cloudFunction, argument, desiredReturnCode, timeStr0, db.TaskReady)
 	if err != nil {
 		t.Fatalf("TestGetReadyTasks: %+v", err)
 	}
@@ -209,7 +204,7 @@ func TestGetReadyTasks(t *testing.T) {
 
 	// som1, func1
 	cloudFunction = "func1"
-	t2, err := createCustomTask(dbConn, somId, productId, cloudFunction, argument, desiredReturnCode, timeStr0, db.TaskReady)
+	t2, err := createCustomTask(dbConn, somId, cloudFunction, argument, desiredReturnCode, timeStr0, db.TaskReady)
 	if err != nil {
 		t.Fatalf("TestGetReadyTasks: %+v", err)
 	}
@@ -219,7 +214,7 @@ func TestGetReadyTasks(t *testing.T) {
 	}
 
 	// som1, func1, complete
-	t3, err := createCustomTask(dbConn, somId, productId, cloudFunction, argument, desiredReturnCode, timeStr0, db.TaskComplete)
+	t3, err := createCustomTask(dbConn, somId, cloudFunction, argument, desiredReturnCode, timeStr0, db.TaskComplete)
 	if err != nil {
 		t.Fatalf("TestGetReadyTasks: %+v", err)
 	}
@@ -230,7 +225,7 @@ func TestGetReadyTasks(t *testing.T) {
 
 	// som0, func1, failed
 	somId = "som0"
-	t4, err := createCustomTask(dbConn, somId, productId, cloudFunction, argument, desiredReturnCode, timeStr0, db.TaskFailed)
+	t4, err := createCustomTask(dbConn, somId, cloudFunction, argument, desiredReturnCode, timeStr0, db.TaskFailed)
 	if err != nil {
 		t.Fatalf("TestGetReadyTasks: %+v", err)
 	}
@@ -240,7 +235,7 @@ func TestGetReadyTasks(t *testing.T) {
 	}
 
 	// som0, func1, ready
-	t5, err := createCustomTask(dbConn, somId, productId, cloudFunction, argument, desiredReturnCode, timeStr0, db.TaskReady)
+	t5, err := createCustomTask(dbConn, somId, cloudFunction, argument, desiredReturnCode, timeStr0, db.TaskReady)
 	if err != nil {
 		t.Fatalf("TestGetReadyTasks: %+v", err)
 	}
@@ -255,7 +250,7 @@ func TestGetReadyTasks(t *testing.T) {
 
 	// som2, func1, ready
 	somId = "som2"
-	t6, err := createCustomTask(dbConn, somId, productId, cloudFunction, argument, desiredReturnCode, timeStr0, db.TaskReady)
+	t6, err := createCustomTask(dbConn, somId, cloudFunction, argument, desiredReturnCode, timeStr0, db.TaskReady)
 	if err != nil {
 		t.Fatalf("TestGetReadyTasks: %+v", err)
 	}
@@ -266,7 +261,7 @@ func TestGetReadyTasks(t *testing.T) {
 
 	// som2, func2, ready
 	cloudFunction = "func2"
-	t7, err := createCustomTask(dbConn, somId, productId, cloudFunction, argument, desiredReturnCode, timeStr0, db.TaskReady)
+	t7, err := createCustomTask(dbConn, somId, cloudFunction, argument, desiredReturnCode, timeStr0, db.TaskReady)
 	if err != nil {
 		t.Fatalf("TestGetReadyTasks: %+v", err)
 	}
@@ -278,7 +273,7 @@ func TestGetReadyTasks(t *testing.T) {
 	// som0, func2, ready, in the future
 	somId = "som3"
 	timeStr1 := "2025-05-14 20:17:32.897647+00:00"
-	t8, err := createCustomTask(dbConn, somId, productId, cloudFunction, argument, desiredReturnCode, timeStr1, db.TaskReady)
+	t8, err := createCustomTask(dbConn, somId, cloudFunction, argument, desiredReturnCode, timeStr1, db.TaskReady)
 
 	if err != nil {
 		t.Fatalf("TestGetReadyTasks: %+v", err)

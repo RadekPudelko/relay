@@ -19,7 +19,7 @@ type Task struct {
 }
 
 func (t Task) String() string {
-	return fmt.Sprintf("task id: %d, som: %s, product:%d, function:%s, argument %s", t.Id, t.Som.SomId, t.Som.ProductId, t.CloudFunction, t.Argument)
+	return fmt.Sprintf("task id: %d, som: %s, function:%s, argument %s", t.Id, t.Som.SomId, t.CloudFunction, t.Argument)
 }
 
 // func NewTask(id int, som *Som, cloudFunction, argument string, desiredReturnCode sql.NullInt64, scheduledTime time.Time, status TaskStatus, tries int) Contact {

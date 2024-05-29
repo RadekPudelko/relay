@@ -24,7 +24,6 @@ func CreateSomsTable(db *sql.DB) error {
          CREATE TABLE IF NOT EXISTS soms (
          id INTEGER PRIMARY KEY AUTOINCREMENT,
          som_id TEXT UNIQUE NOT NULL,
-         product_id INTEGER NOT NULL,
          last_online DATETIME NULL,
          last_ping DATETIME NULL
          )`
