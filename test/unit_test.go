@@ -1,4 +1,4 @@
-package main
+package test
 
 import (
 	"database/sql"
@@ -11,7 +11,7 @@ import (
 	"relay/server"
 )
 
-func testCreateTask(dbConn *sql.DB, somId string,  cloudFunction string, argument string, desiredReturnCode sql.NullInt64, scheduledTime0 time.Time) (int, error) {
+func testCreateTask(dbConn *sql.DB, somId string, cloudFunction string, argument string, desiredReturnCode sql.NullInt64, scheduledTime0 time.Time) (int, error) {
 	id, err := server.CreateTask(dbConn, somId, cloudFunction, argument, desiredReturnCode, scheduledTime0)
 	if err != nil {
 		return 0, fmt.Errorf("testCreateTask: %w", err)
@@ -76,7 +76,7 @@ func TestCreateTasks(t *testing.T) {
 	}
 
 	desiredReturnCode = sql.NullInt64{Int64: 0, Valid: true}
-	tid, err = testCreateTask(dbConn, somId,  cloudFunction, argument, desiredReturnCode, scheduledTime0)
+	tid, err = testCreateTask(dbConn, somId, cloudFunction, argument, desiredReturnCode, scheduledTime0)
 	if err != nil {
 		t.Fatalf("TestCreateTasks: %+v", err)
 	}
@@ -284,4 +284,3 @@ func TestGetReadyTasks(t *testing.T) {
 	}
 	t.Log(t0, t1, t2, t3, t4, t5, t6, t7, t8)
 }
-

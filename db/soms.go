@@ -109,8 +109,7 @@ func InsertOrUpdateSom(db *sql.DB, somId string) (int, error) {
 		return -1, fmt.Errorf("InsertOrUpdateSom: %w", err)
 	}
 	if som != nil {
-        return som.Id, nil
-    }
-    return InsertSom(db, somId)
+		return som.Id, nil
+	}
+	return InsertSom(db, somId)
 }
-

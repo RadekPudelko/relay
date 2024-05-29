@@ -4,8 +4,6 @@ import (
 	"database/sql"
 	"fmt"
 	"log"
-	"net"
-	"net/http"
 	"os"
 
 	"github.com/joho/godotenv"
@@ -55,7 +53,7 @@ func run() error {
 	}
 	defer dbConn.Close()
 
-	err = Run(config, dbConn, particle)
+	err = server.Run(config, dbConn, particle)
 	return nil
 }
 
@@ -72,25 +70,4 @@ func SetupDB(path string) (*sql.DB, error) {
 		return nil, fmt.Errorf("SetupDB: %w", err)
 	}
 	return dbConn, nil
-}
-
-func Run(
-	config server.Config,
-	dbConn *sql.DB,
-	particle particle.ParticleAPI,
-) error {
-
-	go server.BackgroundTask(config, dbConn, particle)
-
-	srv := server.NewServer(dbConn)
-	httpServer := &http.Server{
-		Addr:    net.JoinHostPort(config.Host, config.Port),
-		Handler: srv,
-	}
-
-	if err := httpServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-		fmt.Fprintf(os.Stderr, "error listening and serving: %s\n", err)
-		return err
-	}
-	return nil
 }

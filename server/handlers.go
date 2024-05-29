@@ -111,7 +111,7 @@ func createTaskHandler(dbConn *sql.DB, w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
-    // TODO: Send json?
+	// TODO: Send json?
 	io.WriteString(w, fmt.Sprintf("%d", taskId))
 }
 
@@ -176,4 +176,3 @@ func CreateTask(dbConn *sql.DB, somId string, cloudFunction string, argument str
 
 	return taskId, nil
 }
-

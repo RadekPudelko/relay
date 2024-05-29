@@ -150,4 +150,3 @@ func testToken(token string) (bool, error) {
 		return false, fmt.Errorf("particle.TestToken: Unexpected response from Particle: %d:, body: %s", resp.StatusCode, string(body))
 	}
 }
-

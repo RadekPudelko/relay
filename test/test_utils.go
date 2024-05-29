@@ -1,8 +1,8 @@
-package main
+package test
 
 import (
 	"fmt"
-    "os"
+	"os"
 
 	"relay/db"
 	"relay/particle"
@@ -23,7 +23,7 @@ func runTestServer() error {
 	testDBPath := "test.db3"
 	err := os.Remove(testDBPath)
 	if err != nil {
-	       return fmt.Errorf("run: %w", err)
+		return fmt.Errorf("run: %w", err)
 	}
 	// testDBPath := ":memory:"
 	testDBPath += "?cache=shared"
@@ -39,7 +39,7 @@ func runTestServer() error {
 		return fmt.Errorf("run: %w", err)
 	}
 
-	err = Run(config, dbConn, particle)
+	err = server.Run(config, dbConn, particle)
 	if err != nil {
 		return fmt.Errorf("run: %w", err)
 	}

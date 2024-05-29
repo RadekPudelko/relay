@@ -19,7 +19,7 @@ func NewMock() MockParticle {
 
 func (p MockParticle) Ping(somId string) (bool, error) {
 	// TODO: add latency
-    // TODO: make this random instead
+	// TODO: make this random instead
 	switch somId {
 	case SomPingError:
 		return false, fmt.Errorf("MockParticle.Ping: error")
@@ -32,7 +32,7 @@ func (p MockParticle) Ping(somId string) (bool, error) {
 
 func (p MockParticle) CloudFunction(somId string, cloudFunction string, argument string, returnValue sql.NullInt64) (bool, error) {
 	// TODO: add latency
-    // TODO: make this random instead
+	// TODO: make this random instead
 	switch somId {
 	case SomCFError:
 		return false, fmt.Errorf("MockParticle.CloudFunction: error")
@@ -42,4 +42,3 @@ func (p MockParticle) CloudFunction(somId string, cloudFunction string, argument
 		return true, nil
 	}
 }
-
