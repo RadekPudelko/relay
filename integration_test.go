@@ -5,9 +5,9 @@ import (
 	"testing"
 	"time"
 
-	"pcfs/db"
-    "pcfs/client"
-	// "pcfs/particle"
+	"relay/db"
+    "relay/client"
+	// "relay/particle"
 )
 
 func assertTask(task *db.Task, somId string, cloudFunction string, argument string, desiredReturnCode *int, scheduledTime *time.Time) (error) {

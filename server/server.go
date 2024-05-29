@@ -4,7 +4,7 @@ import (
 	"database/sql"
 	"net/http"
 
-	"pcfs/middleware"
+	"relay/middleware"
 )
 
 func NewServer(dbConn *sql.DB) http.Handler {

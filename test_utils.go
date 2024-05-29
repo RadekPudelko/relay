@@ -4,9 +4,9 @@ import (
 	"fmt"
     "os"
 
-	"pcfs/db"
-	"pcfs/particle"
-	"pcfs/server"
+	"relay/db"
+	"relay/particle"
+	"relay/server"
 )
 
 func runTestServer() error {

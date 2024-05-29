@@ -9,8 +9,8 @@ import (
 	"strconv"
 	"time"
 
-	"pcfs/db"
-	"pcfs/server"
+	"relay/db"
+	"relay/server"
 )
 
 type Client struct {

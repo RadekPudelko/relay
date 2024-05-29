@@ -7,8 +7,8 @@ import (
 	"testing"
 	"time"
 
-	"pcfs/db"
-	"pcfs/server"
+	"relay/db"
+	"relay/server"
 )
 
 func testCreateTask(dbConn *sql.DB, somId string,  cloudFunction string, argument string, desiredReturnCode sql.NullInt64, scheduledTime0 time.Time) (int, error) {
