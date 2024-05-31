@@ -5,11 +5,11 @@ import (
 	"fmt"
 )
 
-const SomPingError = "error"
-const SomPingOffline = "offline"
+const SomPingError = "|1"
+const SomPingOffline = "|2"
 
-const SomCFError = "error"
-const SomCFBadRV = "bad_rv"
+const SomCFError = 1
+const SomCFBadRV = 2
 
 type MockParticle struct{}
 
@@ -17,10 +17,15 @@ func NewMock() MockParticle {
 	return MockParticle{}
 }
 
+// Return is decided by the last 2 letters of the som id
 func (p MockParticle) Ping(somId string) (bool, error) {
+    if len(somId) < 2 {
+        return true, nil
+    }
+
 	// TODO: add latency
 	// TODO: make this random instead
-	switch somId {
+    switch somId[len(somId) - 2:] {
 	case SomPingError:
 		return false, fmt.Errorf("MockParticle.Ping: error")
 	case SomPingOffline:
@@ -30,10 +35,14 @@ func (p MockParticle) Ping(somId string) (bool, error) {
 	}
 }
 
+// Return is decided by the value returnValue
 func (p MockParticle) CloudFunction(somId string, cloudFunction string, argument string, returnValue sql.NullInt64) (bool, error) {
+    if !returnValue.Valid {
+        return true, nil
+    }
 	// TODO: add latency
 	// TODO: make this random instead
-	switch somId {
+	switch returnValue.Int64 {
 	case SomCFError:
 		return false, fmt.Errorf("MockParticle.CloudFunction: error")
 	case SomCFBadRV:
@@ -42,3 +51,4 @@ func (p MockParticle) CloudFunction(somId string, cloudFunction string, argument
 		return true, nil
 	}
 }
+

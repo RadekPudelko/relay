@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"time"
+    "sync"
 
 	"relay/db"
 	"relay/particle"
@@ -23,97 +24,104 @@ func BackgroundTask(config Config, dbConn *sql.DB, particle particle.ParticleAPI
 			log.Fatal("backgroundTask: ", err)
 		}
 
-		log.Printf("Loading %d ready tasks ids from the dbConn\n", len(taskIds))
-		if len(taskIds) == 0 {
+		nTasks := len(taskIds)
+		log.Printf("Loading %d ready tasks ids from the dbConn\n", nTasks)
+		if nTasks == 0 {
 			lastTaskId = 0
 			time.Sleep(2 * time.Second)
 			continue
 		}
-		nTasks := len(taskIds)
 		lastTaskId = taskIds[nTasks-1]
 
-		// TODO: Load additional requests in the background as tasks are processed
+		// TODO: Load additional requests in the background as tasks are processed - need to be careful with this to ignore already loaded tasks, otherwise may load already completed tasks
+        // TODO:
+        i := 0
+        var wg sync.WaitGroup
 		for _, taskId := range taskIds {
 			sem <- 1
+            wg.Add(1)
 			go func(id int) {
 				processTask(config, dbConn, particle, id)
 				<-sem
+                wg.Done()
 			}(taskId)
+            i++
 		}
+        wg.Wait()
+        // time.Sleep(time.Second)
 	}
 }
 
 // TODO: Update the schedule time of the task if its been recently pinged and offline, ping fails or device is offile
 func processTask(config Config, dbConn *sql.DB, particle particle.ParticleAPI, id int) {
-	log.Println("processTask: process task ", id)
 	task, err := db.SelectTask(dbConn, id)
 	if err != nil {
-		log.Println("processTask:", err)
+		log.Printf("processTask: id=%d, %+v\n", id, err)
 		return
 	}
 	// Consider pinging a som if its been more than n seconds since last check
 	if !task.Som.LastOnline.Valid || time.Since(task.Som.LastOnline.Time) > 5*time.Minute {
 		// Only ping a som if we have not pinged in n seconds
 		if task.Som.LastPing.Valid && time.Since(task.Som.LastPing.Time) < 5*time.Minute {
-			log.Printf("processTask: skipping task %d, som %s is not online\n", id, task.Som.SomId)
+			log.Printf("processTask: id=%d, om %s is not online, skipping\n", id, task.Som.SomId)
 			return
 		}
-		log.Printf("processTask: pinging som %s\n", task.Som.SomId)
+		log.Printf("processTask: id=%d, pinging som %s\n", id, task.Som.SomId)
 		online, err := particle.Ping(task.Som.SomId)
 		now := sql.NullTime{Time: time.Now(), Valid: true}
 		if err != nil {
-			log.Println("processTask:", err)
+			log.Printf("processTask: id=%d, %+v\n", id, err)
 			err = db.UpdateSom(dbConn, task.Som.Id, task.Som.LastOnline, now)
 			if err != nil {
-				log.Println("processTask: ", err)
+                log.Printf("processTask: id=%d, %+v\n", id, err)
 			}
 			return
 		}
 		if !online {
-			log.Printf("processTask: som %s is offline\n", task.Som.SomId)
+			log.Printf("processTask: id=%d, som %s is offline\n", id, task.Som.SomId)
 			err = db.UpdateSom(dbConn, task.Som.Id, task.Som.LastOnline, now)
 			// TODO: This and many places like this should never fail, so should the server crash here??
 			if err != nil {
-				log.Println("processTask: ", err)
+                log.Printf("processTask: id=%d, %+v\n", id, err)
 			}
 			return
 		}
 		err = db.UpdateSom(dbConn, task.Som.Id, now, now)
 		if err != nil {
-			log.Println("processTask:", err)
+            log.Printf("processTask: id=%d, %+v\n", id, err)
 			return
 		}
 	}
 
-	log.Printf("processTask: runnning task %d\n", id)
-	log.Printf("processTask: som %s is online\n", task.Som.SomId)
+	log.Printf("processTask: id=%d, som %s is online\n", id, task.Som.SomId)
 	// TODO: may want to get return value from function
 	// TODO: may want to add some way to store error history in the database
 	success, err := particle.CloudFunction(task.Som.SomId, task.CloudFunction, task.Argument, task.DesiredReturnCode)
 	fiveMinLater := time.Now().Add(5 * time.Minute)
 	if err != nil {
-		log.Println("processTask:", err)
-		if task.Tries == config.MaxRetries {
-			log.Printf("processTask task %d has failed due to exceeding max tries, err %v:\n", id, err)
+        log.Printf("processTask: id=%d, tries=%d, %+v", id, task.Tries, err)
+		if task.Tries >= config.MaxRetries {
+            log.Printf("processTask: id=%d has failed due to max failed tries\n", id)
 			err = db.UpdateTask(dbConn, id, task.ScheduledTime, db.TaskFailed, task.Tries+1)
 		} else {
 			err = db.UpdateTask(dbConn, id, fiveMinLater, db.TaskReady, task.Tries+1)
 		}
 		if err != nil {
-			log.Println("processTask:", err)
+			log.Printf("processTask: task=%d, %+v\n", id, err)
 		}
 
 		return
 	}
+
 	if !success {
-		log.Printf("processTask task %d has failed due to mismatch in returned code\n", id)
+        log.Printf("processTask: id=%d has failed due to mismatch in returned code\n", id)
 		err = db.UpdateTask(dbConn, id, task.ScheduledTime, db.TaskFailed, task.Tries+1)
 	} else {
-		log.Printf("processTask: task %d, success\n", id)
+		log.Printf("processTask: id=%d, success\n", id)
 		err = db.UpdateTask(dbConn, id, task.ScheduledTime, db.TaskComplete, task.Tries+1)
 	}
 	if err != nil {
-		log.Println("processTask:", err)
+        log.Printf("processTask: task=%d, %+v\n", id, err)
 	}
 }
 

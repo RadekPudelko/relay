@@ -4,11 +4,17 @@ import (
 	"fmt"
 	"testing"
 	"time"
+    "math/rand"
 
 	"relay/client"
 	"relay/db"
 	// "relay/particle"
 )
+
+type TestTask struct {
+    Id int
+    Status db.TaskStatus
+}
 
 func assertTask(task *db.Task, somId string, cloudFunction string, argument string, desiredReturnCode *int, scheduledTime *time.Time) error {
 	if task.Som.SomId != somId {
@@ -31,6 +37,18 @@ func assertTask(task *db.Task, somId string, cloudFunction string, argument stri
 		return fmt.Errorf("assertTask: scheduled time: expected=%s, got=%s", scheduledTime, task.ScheduledTime)
 	}
 	return nil
+}
+
+func generateTask(nSoms int) (string, int) {
+    somNum := rand.Intn(nSoms)
+    somId := fmt.Sprintf("som_%d", somNum)
+    drc := rand.Intn(3)
+    return somId, drc
+    // return &TestTask{
+    //     Id: somNum,
+    //     Status: db.TaskStatus(drc),
+    // }
+    // id, err := client.CreateTask(somId, cloudFunction, argument, &drc, scheduledTime)
 }
 
 func TestIntegration(t *testing.T) {
@@ -95,4 +113,55 @@ func TestIntegration(t *testing.T) {
 	if !complete {
 		t.Fatalf("TestIntegration: expected task id to complete, final state %v", task)
 	}
+
+
+    nTasks := 100
+    nSoms := 3
+    testTasks := make([]TestTask, nTasks)
+
+    // TODO: use goroutines to hit multiple requests as fast as possible
+    for i:= 0; i < nTasks; i++ {
+        somId, drc := generateTask(nSoms)
+        id, err := client.CreateTask(somId, cloudFunction, argument, &drc, scheduledTime)
+        if err != nil {
+            t.Fatalf("TestIntegration: %+v", err)
+        }
+        testTasks[i].Id = id
+        testTasks[i].Status = db.TaskStatus(drc)
+    }
+
+    for i := 0; i < nTasks; i++ {
+        for {
+            time.Sleep(1 * time.Second)
+            task, err := client.GetTask(testTasks[i].Id)
+            if err != nil {
+                t.Logf("TestIntegration: expected an error for non existant task got %+v\n", task)
+            } else if task.Status != testTasks[i].Status {
+                continue
+            } else if task.Status != testTasks[i].Status {
+               t.Fatalf("TestIntegration: task status mismatch, want=%d, got=%d, task=%+v\n", int(testTasks[i].Status), int(task.Status), task)
+            } else {
+                break
+            }
+        }
+    }
+    // TODO: Assert no task has more than the max tries
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

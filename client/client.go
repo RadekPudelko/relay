@@ -106,3 +106,4 @@ func (c Client) CreateTask(somId string, cloudFunction string, argument string, 
 	}
 	return int(id), nil
 }
+

@@ -204,7 +204,7 @@ func UpdateTask(db *sql.DB, taskId int, scheduledTime time.Time, status TaskStat
 	}
 	defer stmt.Close()
 
-	result, err := stmt.Exec(status, tries, scheduledTime, taskId)
+	result, err := stmt.Exec(int(status), tries, scheduledTime, taskId)
 	if err != nil {
 		return fmt.Errorf("UpdateTask: stmt.Exec: %w", err)
 	}
@@ -219,3 +219,4 @@ func UpdateTask(db *sql.DB, taskId int, scheduledTime time.Time, status TaskStat
 	}
 	return nil
 }
+
