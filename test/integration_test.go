@@ -2,21 +2,32 @@ package test
 
 import (
 	"fmt"
+	"math/rand"
 	"testing"
 	"time"
-    "math/rand"
 
 	"relay/client"
 	"relay/db"
+	"relay/server"
 	// "relay/particle"
 )
 
 type TestTask struct {
-    Id int
-    Status db.TaskStatus
+	Id     int
+	SomId  string
+	DRC    int
+	Status db.TaskStatus
 }
 
-func assertTask(task *db.Task, somId string, cloudFunction string, argument string, desiredReturnCode *int, scheduledTime *time.Time) error {
+func assertTask(
+	task *db.Task,
+	config server.Config,
+	somId string,
+	cloudFunction string,
+	argument string,
+	desiredReturnCode *int,
+	scheduledTime *time.Time,
+) error {
 	if task.Som.SomId != somId {
 		return fmt.Errorf("assertTask: somId, expected=%s, got=%s", somId, task.Som.SomId)
 	}
@@ -36,25 +47,41 @@ func assertTask(task *db.Task, somId string, cloudFunction string, argument stri
 	if scheduledTime != nil && task.ScheduledTime != *scheduledTime {
 		return fmt.Errorf("assertTask: scheduled time: expected=%s, got=%s", scheduledTime, task.ScheduledTime)
 	}
+	if task.Tries > config.MaxRetries {
+		return fmt.Errorf("assertTask: tries=%d exceeds max tries=%d\n", task.Tries, config.MaxRetries)
+	}
 	return nil
 }
 
-func generateTask(nSoms int) (string, int) {
-    somNum := rand.Intn(nSoms)
-    somId := fmt.Sprintf("som_%d", somNum)
-    drc := rand.Intn(3)
-    return somId, drc
-    // return &TestTask{
-    //     Id: somNum,
-    //     Status: db.TaskStatus(drc),
-    // }
-    // id, err := client.CreateTask(somId, cloudFunction, argument, &drc, scheduledTime)
+func generateTask(nSoms int) (string, int, db.TaskStatus) {
+	somNum := rand.Intn(nSoms)
+	somId := fmt.Sprintf("som_%d", somNum)
+	drc := rand.Intn(3) + 1
+	if drc == 3 {
+		return somId, drc, db.TaskComplete
+	} else {
+		return somId, drc, db.TaskFailed
+	}
+	// return &TestTask{
+	//     Id: somNum,
+	//     Status: db.TaskStatus(drc),
+	// }
+	// id, err := client.CreateTask(somId, cloudFunction, argument, &drc, scheduledTime)
 }
 
 func TestIntegration(t *testing.T) {
 	t.Log("TestIntegration")
+	config := server.Config{
+		Host:              "localhost",
+		Port:              "8080",
+		MaxRoutines:       3,
+		TaskLimit:         10,
+		PingRetryDuration: 15 * time.Second,
+		CFRetryDuration:   10 * time.Second,
+		MaxRetries:        3,
+	}
 	go func() {
-		err := runTestServer()
+		err := runTestServer(config)
 		if err != nil {
 			// TODO: Fix this warning
 			t.Fatalf("TestIntegration: %+v", err)
@@ -74,94 +101,45 @@ func TestIntegration(t *testing.T) {
 		t.Fatalf("TestIntegration: expected an error for non existant task got %+v", task)
 	}
 
-	somId := "som0"
 	cloudFunction := "func0"
 	argument := ""
-	var desiredReturnCode *int = nil
 	var scheduledTime *time.Time = nil
 
-	id, err := client.CreateTask(somId, cloudFunction, argument, desiredReturnCode, scheduledTime)
-	if err != nil {
-		t.Fatalf("TestIntegration: %+v", err)
-	}
-	t.Logf("Created task %d\n", id)
-	time.Sleep(1)
+	nTasks := 1000
+	nSoms := 20
+	testTasks := make([]TestTask, nTasks)
 
-	task, err = client.GetTask(id)
-	if err != nil {
-		t.Fatalf("TestIntegration: %+v for id=%d", err, id)
-	}
-
-	err = assertTask(task, somId, cloudFunction, argument, desiredReturnCode, scheduledTime)
-	if err != nil {
-		t.Fatalf("TestIntegration: %+v", err)
-	}
-
-	start := time.Now()
-	complete := false
-	for time.Since(start) < 10*time.Second {
-		task, err := client.GetTask(1)
+	// TODO: use goroutines to hit multiple requests as faster
+	for i := 0; i < nTasks; i++ {
+		somId, drc, status := generateTask(nSoms)
+		id, err := client.CreateTask(somId, cloudFunction, argument, &drc, scheduledTime)
 		if err != nil {
-			t.Logf("TestIntegration: expected an error for non existant task got %+v\n", task)
-		} else if task.Status != db.TaskReady {
-			t.Logf("TestIntegration: task %+v\n", task)
-			complete = true
-			break
+			t.Fatalf("TestIntegration: %+v", err)
 		}
-		time.Sleep(250 * time.Millisecond)
+		testTasks[i].Id = id
+		testTasks[i].SomId = somId
+		testTasks[i].DRC = drc
+		testTasks[i].Status = status
 	}
-	if !complete {
-		t.Fatalf("TestIntegration: expected task id to complete, final state %v", task)
+
+	// TODO: add extra routine to spam the service with gets
+	for i := 0; i < nTasks; i++ {
+		for {
+			task, err := client.GetTask(testTasks[i].Id)
+			if err != nil {
+				t.Logf("TestIntegration: expected an error for non existant task got %+v\n", task)
+			} else if task.Status == db.TaskReady {
+				time.Sleep(100 * time.Millisecond)
+				continue
+			} else if task.Status != testTasks[i].Status {
+				t.Fatalf("TestIntegration: task status mismatch, want=%d, got=%d, task=%+v\n", int(testTasks[i].Status), int(task.Status), task)
+			} else {
+				err = assertTask(task, config, testTasks[i].SomId, cloudFunction, argument, &testTasks[i].DRC, scheduledTime)
+				if err != nil {
+					t.Fatalf("TestIntegration: %+v", err)
+				}
+				break
+			}
+		}
 	}
-
-
-    nTasks := 100
-    nSoms := 3
-    testTasks := make([]TestTask, nTasks)
-
-    // TODO: use goroutines to hit multiple requests as fast as possible
-    for i:= 0; i < nTasks; i++ {
-        somId, drc := generateTask(nSoms)
-        id, err := client.CreateTask(somId, cloudFunction, argument, &drc, scheduledTime)
-        if err != nil {
-            t.Fatalf("TestIntegration: %+v", err)
-        }
-        testTasks[i].Id = id
-        testTasks[i].Status = db.TaskStatus(drc)
-    }
-
-    for i := 0; i < nTasks; i++ {
-        for {
-            time.Sleep(1 * time.Second)
-            task, err := client.GetTask(testTasks[i].Id)
-            if err != nil {
-                t.Logf("TestIntegration: expected an error for non existant task got %+v\n", task)
-            } else if task.Status != testTasks[i].Status {
-                continue
-            } else if task.Status != testTasks[i].Status {
-               t.Fatalf("TestIntegration: task status mismatch, want=%d, got=%d, task=%+v\n", int(testTasks[i].Status), int(task.Status), task)
-            } else {
-                break
-            }
-        }
-    }
-    // TODO: Assert no task has more than the max tries
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

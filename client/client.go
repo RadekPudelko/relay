@@ -81,7 +81,6 @@ func (c Client) CreateTask(somId string, cloudFunction string, argument string, 
 
 	req.Header.Set("Content-Type", "application/json")
 
-	// Perform the request
 	client := &http.Client{}
 	resp, err := client.Do(req)
 	if err != nil {
@@ -99,11 +98,9 @@ func (c Client) CreateTask(somId string, cloudFunction string, argument string, 
 		return 0, fmt.Errorf("CreateTask: request error, status code=%d, body=%s", resp.StatusCode, body)
 	}
 
-	fmt.Printf("Task body %s\n", body)
 	id, err := strconv.ParseInt(string(body), 10, 64)
 	if err != nil {
 		return 0, fmt.Errorf("CreateTask: strconv.ParseInt: %w on %s", err, string(body))
 	}
 	return int(id), nil
 }
-

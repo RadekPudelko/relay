@@ -1,9 +1,13 @@
 package server
 
+import "time"
+
 type Config struct {
-	Host        string
-	Port        string
-	MaxRoutines int
-	TaskLimit   int
-	MaxRetries  int
+	Host              string
+	Port              string
+	MaxRoutines       int
+	PingRetryDuration time.Duration
+	CFRetryDuration   time.Duration
+	TaskLimit         int
+	MaxRetries        int
 }

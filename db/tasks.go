@@ -219,4 +219,3 @@ func UpdateTask(db *sql.DB, taskId int, scheduledTime time.Time, status TaskStat
 	}
 	return nil
 }
-

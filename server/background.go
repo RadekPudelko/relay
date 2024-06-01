@@ -4,8 +4,8 @@ import (
 	"database/sql"
 	"fmt"
 	"log"
+	"sync"
 	"time"
-    "sync"
 
 	"relay/db"
 	"relay/particle"
@@ -15,6 +15,7 @@ import (
 func BackgroundTask(config Config, dbConn *sql.DB, particle particle.ParticleAPI) {
 	var sem = make(chan int, config.MaxRoutines)
 	lastTaskId := 0
+	lastNTasks := 0
 	for true {
 		// Get ready tasks, starting from the lastTaskId, limited 1 per som
 		// This implementation does not care about the order of tasks
@@ -25,30 +26,30 @@ func BackgroundTask(config Config, dbConn *sql.DB, particle particle.ParticleAPI
 		}
 
 		nTasks := len(taskIds)
-		log.Printf("Loading %d ready tasks ids from the dbConn\n", nTasks)
+		if lastNTasks != 0 || nTasks != 0 {
+			log.Printf("Loading %d ready tasks ids from the dbConn\n", nTasks)
+		}
+		lastNTasks = nTasks
 		if nTasks == 0 {
 			lastTaskId = 0
-			time.Sleep(2 * time.Second)
 			continue
 		}
 		lastTaskId = taskIds[nTasks-1]
 
 		// TODO: Load additional requests in the background as tasks are processed - need to be careful with this to ignore already loaded tasks, otherwise may load already completed tasks
-        // TODO:
-        i := 0
-        var wg sync.WaitGroup
+		i := 0
+		var wg sync.WaitGroup
 		for _, taskId := range taskIds {
 			sem <- 1
-            wg.Add(1)
+			wg.Add(1)
 			go func(id int) {
 				processTask(config, dbConn, particle, id)
 				<-sem
-                wg.Done()
+				wg.Done()
 			}(taskId)
-            i++
+			i++
 		}
-        wg.Wait()
-        // time.Sleep(time.Second)
+		wg.Wait()
 	}
 }
 
@@ -60,9 +61,11 @@ func processTask(config Config, dbConn *sql.DB, particle particle.ParticleAPI, i
 		return
 	}
 	// Consider pinging a som if its been more than n seconds since last check
-	if !task.Som.LastOnline.Valid || time.Since(task.Som.LastOnline.Time) > 5*time.Minute {
+	// TODO: define a config for how long a last ping is valid for
+	// TODO: update online time on good communication from cf
+	if !task.Som.LastOnline.Valid || time.Since(task.Som.LastOnline.Time) > config.PingRetryDuration {
 		// Only ping a som if we have not pinged in n seconds
-		if task.Som.LastPing.Valid && time.Since(task.Som.LastPing.Time) < 5*time.Minute {
+		if task.Som.LastPing.Valid && time.Since(task.Som.LastPing.Time) < config.PingRetryDuration {
 			log.Printf("processTask: id=%d, om %s is not online, skipping\n", id, task.Som.SomId)
 			return
 		}
@@ -73,7 +76,7 @@ func processTask(config Config, dbConn *sql.DB, particle particle.ParticleAPI, i
 			log.Printf("processTask: id=%d, %+v\n", id, err)
 			err = db.UpdateSom(dbConn, task.Som.Id, task.Som.LastOnline, now)
 			if err != nil {
-                log.Printf("processTask: id=%d, %+v\n", id, err)
+				log.Printf("processTask: id=%d, %+v\n", id, err)
 			}
 			return
 		}
@@ -82,13 +85,13 @@ func processTask(config Config, dbConn *sql.DB, particle particle.ParticleAPI, i
 			err = db.UpdateSom(dbConn, task.Som.Id, task.Som.LastOnline, now)
 			// TODO: This and many places like this should never fail, so should the server crash here??
 			if err != nil {
-                log.Printf("processTask: id=%d, %+v\n", id, err)
+				log.Printf("processTask: id=%d, %+v\n", id, err)
 			}
 			return
 		}
 		err = db.UpdateSom(dbConn, task.Som.Id, now, now)
 		if err != nil {
-            log.Printf("processTask: id=%d, %+v\n", id, err)
+			log.Printf("processTask: id=%d, %+v\n", id, err)
 			return
 		}
 	}
@@ -97,14 +100,15 @@ func processTask(config Config, dbConn *sql.DB, particle particle.ParticleAPI, i
 	// TODO: may want to get return value from function
 	// TODO: may want to add some way to store error history in the database
 	success, err := particle.CloudFunction(task.Som.SomId, task.CloudFunction, task.Argument, task.DesiredReturnCode)
-	fiveMinLater := time.Now().Add(5 * time.Minute)
+	later := time.Now().Add(config.CFRetryDuration).UTC()
 	if err != nil {
-        log.Printf("processTask: id=%d, tries=%d, %+v", id, task.Tries, err)
-		if task.Tries >= config.MaxRetries {
-            log.Printf("processTask: id=%d has failed due to max failed tries\n", id)
+		log.Printf("processTask: id=%d, tries=%d, %+v", id, task.Tries, err)
+		if task.Tries >= config.MaxRetries-1 { // start from 0
+			log.Printf("processTask: id=%d has failed due to max failed tries\n", id)
 			err = db.UpdateTask(dbConn, id, task.ScheduledTime, db.TaskFailed, task.Tries+1)
 		} else {
-			err = db.UpdateTask(dbConn, id, fiveMinLater, db.TaskReady, task.Tries+1)
+			log.Printf("processTask: id=%d has failed, try again at %s\n", id, later)
+			err = db.UpdateTask(dbConn, id, later, db.TaskReady, task.Tries+1)
 		}
 		if err != nil {
 			log.Printf("processTask: task=%d, %+v\n", id, err)
@@ -114,14 +118,14 @@ func processTask(config Config, dbConn *sql.DB, particle particle.ParticleAPI, i
 	}
 
 	if !success {
-        log.Printf("processTask: id=%d has failed due to mismatch in returned code\n", id)
+		log.Printf("processTask: id=%d has failed due to mismatch in returned code\n", id)
 		err = db.UpdateTask(dbConn, id, task.ScheduledTime, db.TaskFailed, task.Tries+1)
 	} else {
 		log.Printf("processTask: id=%d, success\n", id)
 		err = db.UpdateTask(dbConn, id, task.ScheduledTime, db.TaskComplete, task.Tries+1)
 	}
 	if err != nil {
-        log.Printf("processTask: task=%d, %+v\n", id, err)
+		log.Printf("processTask: task=%d, %+v\n", id, err)
 	}
 }
 
