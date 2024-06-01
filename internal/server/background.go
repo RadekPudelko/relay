@@ -17,11 +17,19 @@ func BackgroundTask(config Config, dbConn *sql.DB, particle particle.ParticleAPI
 	lastRelayId := 0
 	lastNRelays := -1
 	for true {
+        err := handleCancellations(dbConn)
+        if err != nil {
+            // Fatal?
+			log.Fatal("backgroundTask: ", err)
+        }
+
+
 		// Get ready relays, starting from the lastRelayId, limited 1 per device
 		// This implementation does not care about the order of relays
 		// To take into account order, would first need to get list of devices with ready relays, then query the min for each
 		relayIds, err := GetReadyRelays(dbConn, lastRelayId, config.RelayLimit, time.Now().UTC())
 		if err != nil {
+            // Fatal?
 			log.Fatal("backgroundTask: ", err)
 		}
 
@@ -51,6 +59,29 @@ func BackgroundTask(config Config, dbConn *sql.DB, particle particle.ParticleAPI
 		}
 		wg.Wait()
 	}
+}
+
+func handleCancellations(dbConn *sql.DB) (error) {
+    // Handle cancellations 100 at a time until they are all processed
+    for {
+        cancellations, err := models.SelectCancellations(dbConn, 100)
+        if err != nil {
+            return fmt.Errorf("handleCancellations: %w", err)
+        }
+        if len(cancellations) == 0 {
+            return nil
+        }
+        for _, cancellation := range(cancellations) {
+            err := models.UpdateRelayStatus(dbConn, cancellation.RelayId, models.RelayCancelled)
+            if err != nil {
+                return fmt.Errorf("handleCancellations: %w on cancellation %+v", err, cancellation)
+            }
+            err = models.DeleteCancellation(dbConn, cancellation.Id)
+            if err != nil {
+                return fmt.Errorf("handleCancellations: %w on cancellation %+v", err, cancellation)
+            }
+        }
+    }
 }
 
 // TODO: Update the schedule time of the relay if its been recently pinged and offline, ping fails or device is offile

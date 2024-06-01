@@ -42,6 +42,7 @@ const (
 	RelayReady    RelayStatus = 0
 	RelayFailed   RelayStatus = 1
 	RelayComplete RelayStatus = 2
+	RelayCancelled   RelayStatus = 3
 )
 
 // Example of custom field serialization so that instead of reporting sql.NullFields
@@ -69,11 +70,11 @@ const (
 // 	return json.Marshal(n.String)
 // }
 
-func SelectRelay(models *sql.DB, id int) (*Relay, error) {
+func SelectRelay(db *sql.DB, id int) (*Relay, error) {
 	const query string = `SELECT * FROM relays WHERE id = ?`
-	stmt, err := models.Prepare(query)
+	stmt, err := db.Prepare(query)
 	if err != nil {
-		return nil, fmt.Errorf("SelectRelay: models.Prepare: %w", err)
+		return nil, fmt.Errorf("SelectRelay: db.Prepare: %w", err)
 	}
 	defer stmt.Close()
 	// TODO: Apply this approach to other single row reads
@@ -89,7 +90,7 @@ func SelectRelay(models *sql.DB, id int) (*Relay, error) {
 		return nil, fmt.Errorf("SelectRelay: row.Scan: %w", err)
 	}
 
-	relay.Device, err = SelectDevice(models, deviceKey)
+	relay.Device, err = SelectDevice(db, deviceKey)
 	if err != nil {
 		return nil, fmt.Errorf("SelectRelay: %w", err)
 	}
@@ -98,7 +99,7 @@ func SelectRelay(models *sql.DB, id int) (*Relay, error) {
 
 // Select the relays with desired status between with ids betwween start and end (inclusive) occuring after scheduled time.
 // Max of 1 taks per device is reutrned (WHERE rn = 1)
-func SelectRelayIds(models *sql.DB, status RelayStatus, startId, endId, limit *int, scheduledTime time.Time) ([]int, error) {
+func SelectRelayIds(db *sql.DB, status RelayStatus, startId, endId, limit *int, scheduledTime time.Time) ([]int, error) {
 	params := []interface{}{status}
 	query := `
         SELECT MIN(id)
@@ -125,9 +126,9 @@ func SelectRelayIds(models *sql.DB, status RelayStatus, startId, endId, limit *i
 	// fmt.Println(query)
 	// fmt.Println(params)
 
-	stmt, err := models.Prepare(query)
+	stmt, err := db.Prepare(query)
 	if err != nil {
-		return nil, fmt.Errorf("SelectRelayIds: models.Prepare: %w", err)
+		return nil, fmt.Errorf("SelectRelayIds: db.Prepare: %w", err)
 	}
 	defer stmt.Close()
 
@@ -169,15 +170,15 @@ func SelectRelayIds(models *sql.DB, status RelayStatus, startId, endId, limit *i
 	return relayIds, nil
 }
 
-func InsertRelay(models *sql.DB, deviceKey int, cloudFunction string, argument string, desiredReturnCode sql.NullInt64, scheduledTime time.Time) (int, error) {
+func InsertRelay(db *sql.DB, deviceKey int, cloudFunction string, argument string, desiredReturnCode sql.NullInt64, scheduledTime time.Time) (int, error) {
 	const query string = `
         INSERT INTO relays
         (device_key, cloud_function, argument, desired_return_code, scheduled_time, status, tries)
         VALUES (?, ?, ?, ?, ?, ?, ?)
         `
-	stmt, err := models.Prepare(query)
+	stmt, err := db.Prepare(query)
 	if err != nil {
-		return 0, fmt.Errorf("InsertDevice: models.Prepare: %w", err)
+		return 0, fmt.Errorf("InsertDevice: db.Prepare: %w", err)
 	}
 	defer stmt.Close()
 
@@ -192,15 +193,15 @@ func InsertRelay(models *sql.DB, deviceKey int, cloudFunction string, argument s
 	return int(id), nil
 }
 
-func UpdateRelay(models *sql.DB, relayId int, scheduledTime time.Time, status RelayStatus, tries int) error {
+func UpdateRelay(db *sql.DB, relayId int, scheduledTime time.Time, status RelayStatus, tries int) error {
 	const query string = `
         UPDATE relays
         SET status = ?, tries = ?, scheduled_time = ?
         WHERE id = ?
         `
-	stmt, err := models.Prepare(query)
+	stmt, err := db.Prepare(query)
 	if err != nil {
-		return fmt.Errorf("UpdateRelay: models.Prepare: %w", err)
+		return fmt.Errorf("UpdateRelay: db.Prepare: %w", err)
 	}
 	defer stmt.Close()
 
@@ -216,6 +217,34 @@ func UpdateRelay(models *sql.DB, relayId int, scheduledTime time.Time, status Re
 	}
 	if rows != 1 {
 		return fmt.Errorf("UpdateRelay: expected update to affect 1 row, affected %d rows", rows)
+	}
+	return nil
+}
+
+func UpdateRelayStatus(db *sql.DB, relayId int, status RelayStatus) (error) {
+	const query string = `
+        UPDATE relays
+        SET status = ?
+        WHERE id = ?
+        `
+	stmt, err := db.Prepare(query)
+	if err != nil {
+		return fmt.Errorf("UpdateRelayStatus: db.Prepare: %w", err)
+	}
+	defer stmt.Close()
+
+	result, err := stmt.Exec(int(status), relayId)
+	if err != nil {
+		return fmt.Errorf("UpdateRelayStatus: stmt.Exec: %w", err)
+	}
+
+	// Is this necessary?
+	rows, err := result.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("UpdateRelayStatus: result.RowsAffected: %w", err)
+	}
+	if rows != 1 {
+		return fmt.Errorf("UpdateRelayStatus: expected update to affect 1 row, affected %d rows", rows)
 	}
 	return nil
 }

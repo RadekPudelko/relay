@@ -16,6 +16,10 @@ func CreateTables(db *sql.DB) error {
 	if err != nil {
 		return fmt.Errorf("SetupDatabase: %w", err)
 	}
+	err = CreateCancellationsTable(db)
+	if err != nil {
+		return fmt.Errorf("SetupDatabase: %w", err)
+	}
 	return nil
 }
 
@@ -51,6 +55,20 @@ func CreateRelaysTable(db *sql.DB) error {
 	_, err := db.Exec(query)
 	if err != nil {
 		return fmt.Errorf("CreateRelaysTable: db.Exec: %w", err)
+	}
+	return nil
+}
+
+func CreateCancellationsTable(db *sql.DB) error {
+	const query string = `
+        CREATE TABLE IF NOT EXISTS cancellations (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        relay_id INTEGER UNIQUE NOT NULL,
+        FOREIGN KEY(relay_id) REFERENCES relays(id)
+        )`
+	_, err := db.Exec(query)
+	if err != nil {
+		return fmt.Errorf("CreateCancellations: db.Exec: %w", err)
 	}
 	return nil
 }

@@ -12,4 +12,5 @@ func addRoutes(
 	mux.Handle("GET /{$}", HandleGetRoot())
 	mux.Handle("POST /api/relays", HandleCreateRelay(dbConn))
 	mux.Handle("GET /api/relays/{id}", HandleGetRelay(dbConn))
+	mux.Handle("DELETE /api/relays/{id}", HandleCancelRelay(dbConn))
 }
