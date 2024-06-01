@@ -10,6 +10,6 @@ func addRoutes(
 	dbConn *sql.DB,
 ) {
 	mux.Handle("GET /{$}", HandleGetRoot())
-	mux.Handle("POST /api/tasks", HandleCreateTask(dbConn))
-	mux.Handle("GET /api/tasks/{id}", HandleGetTask(dbConn))
+	mux.Handle("POST /api/relays", HandleCreateRelay(dbConn))
+	mux.Handle("GET /api/relays/{id}", HandleGetRelay(dbConn))
 }

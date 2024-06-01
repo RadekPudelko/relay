@@ -10,8 +10,8 @@ import (
 )
 
 type ParticleAPI interface {
-	Ping(somId string) (bool, error)
-	CloudFunction(somId string, cloudFunction string, argument string, returnValue sql.NullInt64) (bool, error)
+	Ping(deviceId string) (bool, error)
+	CloudFunction(deviceId string, cloudFunction string, argument string, returnValue sql.NullInt64) (bool, error)
 }
 
 type Particle struct {
@@ -32,11 +32,11 @@ func NewParticle(token string) (*Particle, error) {
 // https://docs.particle.io/reference/cloud-apis/api/#errors
 // 408 is not actually used?
 
-func (p Particle) Ping(somId string) (bool, error) {
+func (p Particle) Ping(deviceId string) (bool, error) {
 	queryParams := url.Values{}
 	queryParams.Set("access_token", p.token)
 
-	url := fmt.Sprintf("https://api.particle.io/v1/devices/%s/ping", somId)
+	url := fmt.Sprintf("https://api.particle.io/v1/devices/%s/ping", deviceId)
 	url += "?" + queryParams.Encode()
 
 	req, err := http.NewRequest("PUT", url, nil)
@@ -76,12 +76,12 @@ func (p Particle) Ping(somId string) (bool, error) {
 	return response.Online, nil
 }
 
-func (p Particle) CloudFunction(somId string, cloudFunction string, argument string, returnValue sql.NullInt64) (bool, error) {
+func (p Particle) CloudFunction(deviceId string, cloudFunction string, argument string, returnValue sql.NullInt64) (bool, error) {
 	params := url.Values{}
 	params.Add("access_token", p.token)
 	params.Add("arg", argument)
 
-	url := fmt.Sprintf("https://api.particle.io/v1/devices/%s/%s", somId, cloudFunction)
+	url := fmt.Sprintf("https://api.particle.io/v1/devices/%s/%s", deviceId, cloudFunction)
 
 	// This can block for a long time
 	resp, err := http.PostForm(url, params)

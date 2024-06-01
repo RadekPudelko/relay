@@ -5,12 +5,12 @@ import (
 	"fmt"
 )
 
-const SomPingError = "|1"
-const SomPingOffline = "|2"
+const DevicePingError = "|1"
+const DevicePingOffline = "|2"
 
-const SomCFError = 1
-const SomCFBadRV = 2
-const SomCFSuccess = 3
+const DeviceCFError = 1
+const DeviceCFBadRV = 2
+const DeviceCFSuccess = 3
 
 type MockParticle struct{}
 
@@ -18,18 +18,18 @@ func NewMock() MockParticle {
 	return MockParticle{}
 }
 
-// Return is decided by the last 2 letters of the som id
-func (p MockParticle) Ping(somId string) (bool, error) {
-	if len(somId) < 2 {
+// Return is decided by the last 2 letters of the device id
+func (p MockParticle) Ping(deviceId string) (bool, error) {
+	if len(deviceId) < 2 {
 		return true, nil
 	}
 
 	// TODO: add latency
 	// TODO: make this random instead
-	switch somId[len(somId)-2:] {
-	case SomPingError:
+	switch deviceId[len(deviceId)-2:] {
+	case DevicePingError:
 		return false, fmt.Errorf("MockParticle.Ping: error")
-	case SomPingOffline:
+	case DevicePingOffline:
 		return false, nil
 	default: // online
 		return true, nil
@@ -37,16 +37,16 @@ func (p MockParticle) Ping(somId string) (bool, error) {
 }
 
 // Return is decided by the value returnValue
-func (p MockParticle) CloudFunction(somId string, cloudFunction string, argument string, returnValue sql.NullInt64) (bool, error) {
+func (p MockParticle) CloudFunction(deviceId string, cloudFunction string, argument string, returnValue sql.NullInt64) (bool, error) {
 	if !returnValue.Valid {
 		return true, nil
 	}
 	// TODO: add latency
 	// TODO: make this random instead
 	switch returnValue.Int64 {
-	case SomCFError:
+	case DeviceCFError:
 		return false, fmt.Errorf("MockParticle.CloudFunction: error")
-	case SomCFBadRV:
+	case DeviceCFBadRV:
 		return false, nil
 	default: // good return value
 		return true, nil

@@ -21,20 +21,20 @@ func main() {
 		fmt.Println(err)
 	}
 
-	somId := "som0"
+	deviceId := "device0"
 	cloudFunction := "func0"
 	argument := ""
 	var desiredReturnCode *int = nil
 	var scheduledTime *time.Time = nil
 
-	id, err := client.CreateTask(somId, cloudFunction, argument, desiredReturnCode, scheduledTime)
+	id, err := client.CreateRelay(deviceId, cloudFunction, argument, desiredReturnCode, scheduledTime)
 	if err != nil {
 		fmt.Println(err)
 	}
-	fmt.Printf("Created task %d\n", id)
-	task, err := client.GetTask(id)
+	fmt.Printf("Created relay %d\n", id)
+	relay, err := client.GetRelay(id)
 	if err != nil {
 		fmt.Println(err)
 	}
-	fmt.Printf("%+v\n", task)
+	fmt.Printf("%+v\n", relay)
 }

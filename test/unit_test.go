@@ -11,95 +11,95 @@ import (
 	"relay/server"
 )
 
-func testCreateTask(dbConn *sql.DB, somId string, cloudFunction string, argument string, desiredReturnCode sql.NullInt64, scheduledTime0 time.Time) (int, error) {
-	id, err := server.CreateTask(dbConn, somId, cloudFunction, argument, desiredReturnCode, scheduledTime0)
+func testCreateRelay(dbConn *sql.DB, relayId string, cloudFunction string, argument string, desiredReturnCode sql.NullInt64, scheduledTime0 time.Time) (int, error) {
+	id, err := server.CreateRelay(dbConn, relayId, cloudFunction, argument, desiredReturnCode, scheduledTime0)
 	if err != nil {
-		return 0, fmt.Errorf("testCreateTask: %w", err)
+		return 0, fmt.Errorf("testCreateRelay: %w", err)
 	}
 
-	task, err := db.SelectTask(dbConn, id)
+	relay, err := db.SelectRelay(dbConn, id)
 	if err != nil {
-		return 0, fmt.Errorf("testCreateTask: %w", err)
+		return 0, fmt.Errorf("testCreateRelay: %w", err)
 	}
 
-	if task.Som.SomId != somId {
-		return 0, fmt.Errorf("testCreateTask: SelectTask on task %d got somId %s, expected %s", id, task.Som.SomId, somId)
+	if relay.Device.DeviceId != relayId {
+		return 0, fmt.Errorf("testCreateRelay: SelectRelay on relay %d got relayId %s, expected %s", id, relay.Device.DeviceId, relayId)
 	}
-	if task.CloudFunction != cloudFunction {
-		return 0, fmt.Errorf("testCreateTask: SelectTask on task %d got cloudFunction %s, expected %s", id, task.CloudFunction, cloudFunction)
+	if relay.CloudFunction != cloudFunction {
+		return 0, fmt.Errorf("testCreateRelay: SelectRelay on relay %d got cloudFunction %s, expected %s", id, relay.CloudFunction, cloudFunction)
 	}
-	if task.Argument != argument {
-		return 0, fmt.Errorf("testCreateTask: SelectTask on task %d got argument %s, expected %s", id, task.Argument, argument)
+	if relay.Argument != argument {
+		return 0, fmt.Errorf("testCreateRelay: SelectRelay on relay %d got argument %s, expected %s", id, relay.Argument, argument)
 	}
-	if task.DesiredReturnCode != desiredReturnCode {
-		return 0, fmt.Errorf("testCreateTask: SelectTask on task %d got desiredReturnCode %+v, expected %+v", id, task.DesiredReturnCode, desiredReturnCode)
+	if relay.DesiredReturnCode != desiredReturnCode {
+		return 0, fmt.Errorf("testCreateRelay: SelectRelay on relay %d got desiredReturnCode %+v, expected %+v", id, relay.DesiredReturnCode, desiredReturnCode)
 	}
-	if task.ScheduledTime != scheduledTime0 {
-		return 0, fmt.Errorf("testCreateTask: SelectTask on task %d got scheduledTime0 %s, expected %s", id, task.ScheduledTime, scheduledTime0)
+	if relay.ScheduledTime != scheduledTime0 {
+		return 0, fmt.Errorf("testCreateRelay: SelectRelay on relay %d got scheduledTime0 %s, expected %s", id, relay.ScheduledTime, scheduledTime0)
 	}
 	return id, nil
 }
 
-func TestCreateTasks(t *testing.T) {
+func TestCreateRelays(t *testing.T) {
 	dbConn, err := db.Connect("file::memory:?cache=shared")
 	if err != nil {
-		t.Fatalf("TestCreateTasks: %+v", err)
+		t.Fatalf("TestCreateRelays: %+v", err)
 	}
 	defer dbConn.Close()
 
 	err = db.CreateTables(dbConn)
 	if err != nil {
-		t.Fatalf("TestCreateTasks: %+v", err)
+		t.Fatalf("TestCreateRelays: %+v", err)
 	}
 
-	somId := "somid0"
+	relayId := "devid0"
 	cloudFunction := "func1"
 	argument := ""
 	desiredReturnCode := sql.NullInt64{Int64: 0, Valid: false}
 	scheduledTime0 := time.Now().UTC()
 
-	tid, err := testCreateTask(dbConn, somId, cloudFunction, argument, desiredReturnCode, scheduledTime0)
+	tid, err := testCreateRelay(dbConn, relayId, cloudFunction, argument, desiredReturnCode, scheduledTime0)
 	if err != nil {
-		t.Fatalf("TestCreateTasks: %+v", err)
+		t.Fatalf("TestCreateRelays: %+v", err)
 	}
 	if tid != 1 {
-		t.Fatalf("TestCreateTasks: expected to create task id 1, got %d", tid)
+		t.Fatalf("TestCreateRelays: expected to create relay id 1, got %d", tid)
 	}
 
-	somId = "somid1"
-	tid, err = testCreateTask(dbConn, somId, cloudFunction, argument, desiredReturnCode, scheduledTime0)
+	relayId = "devid1"
+	tid, err = testCreateRelay(dbConn, relayId, cloudFunction, argument, desiredReturnCode, scheduledTime0)
 	if err != nil {
-		t.Fatalf("TestCreateTasks: %+v", err)
+		t.Fatalf("TestCreateRelays: %+v", err)
 	}
 	if tid != 2 {
-		t.Fatalf("TestCreateTasks: expected to create task id 2, got %d", tid)
+		t.Fatalf("TestCreateRelays: expected to create relay id 2, got %d", tid)
 	}
 
 	desiredReturnCode = sql.NullInt64{Int64: 0, Valid: true}
-	tid, err = testCreateTask(dbConn, somId, cloudFunction, argument, desiredReturnCode, scheduledTime0)
+	tid, err = testCreateRelay(dbConn, relayId, cloudFunction, argument, desiredReturnCode, scheduledTime0)
 	if err != nil {
-		t.Fatalf("TestCreateTasks: %+v", err)
+		t.Fatalf("TestCreateRelays: %+v", err)
 	}
 	if tid != 3 {
-		t.Fatalf("TestCreateTasks: expected to create task id 3, got %d", tid)
+		t.Fatalf("TestCreateRelays: expected to create relay id 3, got %d", tid)
 	}
 }
 
-func createCustomTask(dbConn *sql.DB, somId string, cloudFunction, argument string, desiredReturnCode sql.NullInt64, timeStr string, status db.TaskStatus) (int, error) {
+func createCustomRelay(dbConn *sql.DB, relayId string, cloudFunction, argument string, desiredReturnCode sql.NullInt64, timeStr string, status db.RelayStatus) (int, error) {
 	layout := "2006-01-02 15:04:05.999999-07:00"
 	scheduledTime, err := time.Parse(layout, timeStr)
 	if err != nil {
-		return 0, fmt.Errorf("createCustomTask: time.Parse on %s", timeStr)
+		return 0, fmt.Errorf("createCustomRelay: time.Parse on %s", timeStr)
 	}
 	scheduledTime = scheduledTime.UTC()
 
-	tid, err := testCreateTask(dbConn, somId, cloudFunction, argument, desiredReturnCode, scheduledTime)
+	tid, err := testCreateRelay(dbConn, relayId, cloudFunction, argument, desiredReturnCode, scheduledTime)
 	if err != nil {
-		return 0, fmt.Errorf("createCustomTask: %w", err)
+		return 0, fmt.Errorf("createCustomRelay: %w", err)
 	}
-	err = db.UpdateTask(dbConn, tid, scheduledTime, status, 1)
+	err = db.UpdateRelay(dbConn, tid, scheduledTime, status, 1)
 	if err != nil {
-		return 0, fmt.Errorf("createCustomTask: %w", err)
+		return 0, fmt.Errorf("createCustomRelay: %w", err)
 	}
 	return tid, nil
 }
@@ -117,170 +117,170 @@ func sliceCompare(a, b []int) bool {
 	return true
 }
 
-func testGetReadyTasks(dbConn *sql.DB, searchTime string, startId, limit int, expectedTasksIds []int) error {
+func testGetReadyRelay(dbConn *sql.DB, searchTime string, startId, limit int, expectedRelayIds []int) error {
 	const layout string = "2006-01-02 15:04:05.999999-07:00"
-	// Search all tasks
+	// Search all relays
 	testScheduledTime, err := time.Parse(layout, searchTime)
 	if err != nil {
-		return fmt.Errorf("testGetReadyTasks: time.Parse %w on %s", err, searchTime)
+		return fmt.Errorf("testGetReadyRelay: time.Parse %w on %s", err, searchTime)
 	}
 	testScheduledTime = testScheduledTime.UTC()
-	tasks, err := server.GetReadyTasks(dbConn, startId, limit, testScheduledTime)
+	relays, err := server.GetReadyRelays(dbConn, startId, limit, testScheduledTime)
 	if err != nil {
-		return fmt.Errorf("testGetReadyTasks: %w", err)
+		return fmt.Errorf("testGetReadyRelay: %w", err)
 	}
-	if !sliceCompare(tasks, expectedTasksIds) {
-		return fmt.Errorf("TestGetReadyTasks: mismatch tasks, expected %+v, got %+v", expectedTasksIds, tasks)
+	if !sliceCompare(relays, expectedRelayIds) {
+		return fmt.Errorf("TestGetReadyRelays: mismatch relays, expected %+v, got %+v", expectedRelayIds, relays)
 	}
 	return nil
 }
 
-func TestGetReadyTasks(t *testing.T) {
+func TestGetReadyRelays(t *testing.T) {
 	// TODO:
-	// Preload database with tasks, have some tasks ready, complete and failed
-	// Request tasks with low limit, high limit, cause it to wrap, etc
-	// Check tasks to see if you get whats expected
+	// Preload database with relays, have some relays ready, complete and failed
+	// Request relays with low limit, high limit, cause it to wrap, etc
+	// Check relays to see if you get whats expected
 	// dbConn, err := db.Connect("file::memory:?cache=shared")
 	testDBPath := "test.db3"
 	// Attempt to delete the file
 	err := os.Remove(testDBPath)
 	if err != nil {
-		t.Fatalf("TestGetReadyTasks: %+v", err)
+		t.Fatalf("TestGetReadyRelays: %+v", err)
 	}
 	dbConn, err := db.Connect(testDBPath + "?cache=shared")
 	if err != nil {
-		t.Fatalf("TestGetReadyTasks: %+v", err)
+		t.Fatalf("TestGetReadyRelays: %+v", err)
 	}
 	defer dbConn.Close()
 
 	err = db.CreateTables(dbConn)
 	if err != nil {
-		t.Fatalf("TestGetReadyTasks: %+v", err)
+		t.Fatalf("TestGetReadyRelays: %+v", err)
 	}
 
-	testTimeStr := "2024-05-15 20:17:32.897647+00:00" // 1 day after scheduled tasks
+	testTimeStr := "2024-05-15 20:17:32.897647+00:00" // 1 day after scheduled relays
 
-	somId := "som0"
+	relayId := "dev0"
 	cloudFunction := "func0"
 	argument := ""
 	desiredReturnCode := sql.NullInt64{Int64: 0, Valid: false}
 	timeStr0 := "2024-05-14 20:17:32.897647+00:00"
 
-	// No tasks
-	err = testGetReadyTasks(dbConn, timeStr0, 0, 10, []int{})
+	// No relays
+	err = testGetReadyRelay(dbConn, timeStr0, 0, 10, []int{})
 	if err != nil {
-		t.Fatalf("TestGetReadyTasks: %+v", err)
+		t.Fatalf("TestGetReadyRelays: %+v", err)
 	}
 
-	// som0
-	t0, err := createCustomTask(dbConn, somId, cloudFunction, argument, desiredReturnCode, timeStr0, db.TaskReady)
+	// dev0
+	t0, err := createCustomRelay(dbConn, relayId, cloudFunction, argument, desiredReturnCode, timeStr0, db.RelayReady)
 	if err != nil {
-		t.Fatalf("TestGetReadyTasks: %+v", err)
+		t.Fatalf("TestGetReadyRelays: %+v", err)
 	}
-	err = testGetReadyTasks(dbConn, testTimeStr, 1, 1, []int{t0})
+	err = testGetReadyRelay(dbConn, testTimeStr, 1, 1, []int{t0})
 	if err != nil {
-		t.Fatalf("TestGetReadyTasks: %+v", err)
-	}
-
-	// som1
-	somId = "som1"
-	t1, err := createCustomTask(dbConn, somId, cloudFunction, argument, desiredReturnCode, timeStr0, db.TaskReady)
-	if err != nil {
-		t.Fatalf("TestGetReadyTasks: %+v", err)
-	}
-	err = testGetReadyTasks(dbConn, testTimeStr, 1, 1, []int{t0})
-	if err != nil {
-		t.Fatalf("TestGetReadyTasks: %+v", err)
-	}
-	err = testGetReadyTasks(dbConn, testTimeStr, 1, 2, []int{t0, t1})
-	if err != nil {
-		t.Fatalf("TestGetReadyTasks: %+v", err)
-	}
-	// err = testGetReadyTasks(dbConn, testTimeStr, 2, 3, []int{t1, t0}) // TODO: support wrap
-	err = testGetReadyTasks(dbConn, testTimeStr, 2, 3, []int{t1})
-	if err != nil {
-		t.Fatalf("TestGetReadyTasks: %+v", err)
+		t.Fatalf("TestGetReadyRelays: %+v", err)
 	}
 
-	// som1, func1
+	// dev1
+	relayId = "dev1"
+	t1, err := createCustomRelay(dbConn, relayId, cloudFunction, argument, desiredReturnCode, timeStr0, db.RelayReady)
+	if err != nil {
+		t.Fatalf("TestGetReadyRelays: %+v", err)
+	}
+	err = testGetReadyRelay(dbConn, testTimeStr, 1, 1, []int{t0})
+	if err != nil {
+		t.Fatalf("TestGetReadyRelays: %+v", err)
+	}
+	err = testGetReadyRelay(dbConn, testTimeStr, 1, 2, []int{t0, t1})
+	if err != nil {
+		t.Fatalf("TestGetReadyRelays: %+v", err)
+	}
+	// err = testGetReadyRelay(dbConn, testTimeStr, 2, 3, []int{t1, t0}) // TODO: support wrap
+	err = testGetReadyRelay(dbConn, testTimeStr, 2, 3, []int{t1})
+	if err != nil {
+		t.Fatalf("TestGetReadyRelays: %+v", err)
+	}
+
+	// dev1, func1
 	cloudFunction = "func1"
-	t2, err := createCustomTask(dbConn, somId, cloudFunction, argument, desiredReturnCode, timeStr0, db.TaskReady)
+	t2, err := createCustomRelay(dbConn, relayId, cloudFunction, argument, desiredReturnCode, timeStr0, db.RelayReady)
 	if err != nil {
-		t.Fatalf("TestGetReadyTasks: %+v", err)
+		t.Fatalf("TestGetReadyRelays: %+v", err)
 	}
-	err = testGetReadyTasks(dbConn, testTimeStr, 1, 3, []int{t0, t1})
+	err = testGetReadyRelay(dbConn, testTimeStr, 1, 3, []int{t0, t1})
 	if err != nil {
-		t.Fatalf("TestGetReadyTasks: %+v", err)
-	}
-
-	// som1, func1, complete
-	t3, err := createCustomTask(dbConn, somId, cloudFunction, argument, desiredReturnCode, timeStr0, db.TaskComplete)
-	if err != nil {
-		t.Fatalf("TestGetReadyTasks: %+v", err)
-	}
-	err = testGetReadyTasks(dbConn, testTimeStr, 1, 3, []int{t0, t1})
-	if err != nil {
-		t.Fatalf("TestGetReadyTasks: %+v", err)
+		t.Fatalf("TestGetReadyRelays: %+v", err)
 	}
 
-	// som0, func1, failed
-	somId = "som0"
-	t4, err := createCustomTask(dbConn, somId, cloudFunction, argument, desiredReturnCode, timeStr0, db.TaskFailed)
+	// dev1, func1, complete
+	t3, err := createCustomRelay(dbConn, relayId, cloudFunction, argument, desiredReturnCode, timeStr0, db.RelayComplete)
 	if err != nil {
-		t.Fatalf("TestGetReadyTasks: %+v", err)
+		t.Fatalf("TestGetReadyRelays: %+v", err)
 	}
-	err = testGetReadyTasks(dbConn, testTimeStr, 1, 3, []int{t0, t1})
+	err = testGetReadyRelay(dbConn, testTimeStr, 1, 3, []int{t0, t1})
 	if err != nil {
-		t.Fatalf("TestGetReadyTasks: %+v", err)
-	}
-
-	// som0, func1, ready
-	t5, err := createCustomTask(dbConn, somId, cloudFunction, argument, desiredReturnCode, timeStr0, db.TaskReady)
-	if err != nil {
-		t.Fatalf("TestGetReadyTasks: %+v", err)
-	}
-	err = testGetReadyTasks(dbConn, testTimeStr, 1, 3, []int{t0, t1})
-	if err != nil {
-		t.Fatalf("TestGetReadyTasks: %+v", err)
-	}
-	err = testGetReadyTasks(dbConn, testTimeStr, t1, 3, []int{t1, t5})
-	if err != nil {
-		t.Fatalf("TestGetReadyTasks: %+v", err)
+		t.Fatalf("TestGetReadyRelays: %+v", err)
 	}
 
-	// som2, func1, ready
-	somId = "som2"
-	t6, err := createCustomTask(dbConn, somId, cloudFunction, argument, desiredReturnCode, timeStr0, db.TaskReady)
+	// dev0, func1, failed
+	relayId = "dev0"
+	t4, err := createCustomRelay(dbConn, relayId, cloudFunction, argument, desiredReturnCode, timeStr0, db.RelayFailed)
 	if err != nil {
-		t.Fatalf("TestGetReadyTasks: %+v", err)
+		t.Fatalf("TestGetReadyRelays: %+v", err)
 	}
-	err = testGetReadyTasks(dbConn, testTimeStr, t0, 10, []int{t0, t1, t6})
+	err = testGetReadyRelay(dbConn, testTimeStr, 1, 3, []int{t0, t1})
 	if err != nil {
-		t.Fatalf("TestGetReadyTasks: %+v", err)
+		t.Fatalf("TestGetReadyRelays: %+v", err)
 	}
 
-	// som2, func2, ready
+	// dev0, func1, ready
+	t5, err := createCustomRelay(dbConn, relayId, cloudFunction, argument, desiredReturnCode, timeStr0, db.RelayReady)
+	if err != nil {
+		t.Fatalf("TestGetReadyRelays: %+v", err)
+	}
+	err = testGetReadyRelay(dbConn, testTimeStr, 1, 3, []int{t0, t1})
+	if err != nil {
+		t.Fatalf("TestGetReadyRelays: %+v", err)
+	}
+	err = testGetReadyRelay(dbConn, testTimeStr, t1, 3, []int{t1, t5})
+	if err != nil {
+		t.Fatalf("TestGetReadyRelays: %+v", err)
+	}
+
+	// dev2, func1, ready
+	relayId = "dev2"
+	t6, err := createCustomRelay(dbConn, relayId, cloudFunction, argument, desiredReturnCode, timeStr0, db.RelayReady)
+	if err != nil {
+		t.Fatalf("TestGetReadyRelays: %+v", err)
+	}
+	err = testGetReadyRelay(dbConn, testTimeStr, t0, 10, []int{t0, t1, t6})
+	if err != nil {
+		t.Fatalf("TestGetReadyRelays: %+v", err)
+	}
+
+	// dev2, func2, ready
 	cloudFunction = "func2"
-	t7, err := createCustomTask(dbConn, somId, cloudFunction, argument, desiredReturnCode, timeStr0, db.TaskReady)
+	t7, err := createCustomRelay(dbConn, relayId, cloudFunction, argument, desiredReturnCode, timeStr0, db.RelayReady)
 	if err != nil {
-		t.Fatalf("TestGetReadyTasks: %+v", err)
+		t.Fatalf("TestGetReadyRelays: %+v", err)
 	}
-	err = testGetReadyTasks(dbConn, testTimeStr, t0, 10, []int{t0, t1, t6})
+	err = testGetReadyRelay(dbConn, testTimeStr, t0, 10, []int{t0, t1, t6})
 	if err != nil {
-		t.Fatalf("TestGetReadyTasks: %+v", err)
+		t.Fatalf("TestGetReadyRelays: %+v", err)
 	}
 
-	// som0, func2, ready, in the future
-	somId = "som3"
+	// dev0, func2, ready, in the future
+	relayId = "dev3"
 	timeStr1 := "2025-05-14 20:17:32.897647+00:00"
-	t8, err := createCustomTask(dbConn, somId, cloudFunction, argument, desiredReturnCode, timeStr1, db.TaskReady)
+	t8, err := createCustomRelay(dbConn, relayId, cloudFunction, argument, desiredReturnCode, timeStr1, db.RelayReady)
 
 	if err != nil {
-		t.Fatalf("TestGetReadyTasks: %+v", err)
+		t.Fatalf("TestGetReadyRelays: %+v", err)
 	}
-	err = testGetReadyTasks(dbConn, testTimeStr, t0, 10, []int{t0, t1, t6})
+	err = testGetReadyRelay(dbConn, testTimeStr, t0, 10, []int{t0, t1, t6})
 	if err != nil {
-		t.Fatalf("TestGetReadyTasks: %+v", err)
+		t.Fatalf("TestGetReadyRelays: %+v", err)
 	}
 	t.Log(t0, t1, t2, t3, t4, t5, t6, t7, t8)
 }

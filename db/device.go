@@ -36,7 +36,7 @@ func SelectDevice(db *sql.DB, key int) (*Device, error) {
 }
 
 func SelectDeviceByDeviceId(db *sql.DB, deviceId string) (*Device, error) {
-	const query string = `SELECT * FROM devices WHERE som_id = ?`
+	const query string = `SELECT * FROM devices WHERE device_id = ?`
 	stmt, err := db.Prepare(query)
 	if err != nil {
 		return nil, fmt.Errorf("SelectDeviceByDeviceId: db.Prepare: %w", err)
@@ -82,7 +82,7 @@ func UpdateDevice(db *sql.DB, id int, onlineTime, pingTime sql.NullTime) error {
 }
 
 func InsertDevice(db *sql.DB, deviceId string) (int, error) {
-	const query string = `INSERT INTO devices (som_id, last_online, last_ping) VALUES (?, ?, ?)`
+	const query string = `INSERT INTO devices (device_id, last_online, last_ping) VALUES (?, ?, ?)`
 	stmt, err := db.Prepare(query)
 	if err != nil {
 		return 0, fmt.Errorf("InsertDevice: db.Prepare: %w", err)

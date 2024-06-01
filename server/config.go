@@ -8,6 +8,6 @@ type Config struct {
 	MaxRoutines       int
 	PingRetryDuration time.Duration
 	CFRetryDuration   time.Duration
-	TaskLimit         int
+	RelayLimit        int
 	MaxRetries        int
 }

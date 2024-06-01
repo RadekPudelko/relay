@@ -12,61 +12,56 @@ import (
 	// "relay/particle"
 )
 
-type TestTask struct {
-	Id     int
-	DeviceId  string
-	DRC    int
-	Status db.TaskStatus
+type TestRelay struct {
+	Id       int
+	DeviceId string
+	DRC      int
+	Status   db.RelayStatus
 }
 
-func assertTask(
-	task *db.Task,
+func assertRelay(
+	relay *db.Relay,
 	config server.Config,
-	somId string,
+	deviceId string,
 	cloudFunction string,
 	argument string,
 	desiredReturnCode *int,
 	scheduledTime *time.Time,
 ) error {
-	if task.Device.DeviceId != somId {
-		return fmt.Errorf("assertTask: somId, expected=%s, got=%s", somId, task.Device.DeviceId)
+	if relay.Device.DeviceId != deviceId {
+		return fmt.Errorf("assertRelay: deviceId, expected=%s, got=%s", deviceId, relay.Device.DeviceId)
 	}
-	if task.CloudFunction != cloudFunction {
-		return fmt.Errorf("assertTask: cloudFunction, expected=%s, got=%s", cloudFunction, task.CloudFunction)
+	if relay.CloudFunction != cloudFunction {
+		return fmt.Errorf("assertRelay: cloudFunction, expected=%s, got=%s", cloudFunction, relay.CloudFunction)
 	}
-	if task.Argument != argument {
-		return fmt.Errorf("assertTask: argument, expected=%s, got=%s", argument, task.Argument)
+	if relay.Argument != argument {
+		return fmt.Errorf("assertRelay: argument, expected=%s, got=%s", argument, relay.Argument)
 	}
 	if desiredReturnCode != nil {
-		if !task.DesiredReturnCode.Valid {
-			return fmt.Errorf("assertTask: desired return code: got invalid")
-		} else if int(task.DesiredReturnCode.Int64) != *desiredReturnCode {
-			return fmt.Errorf("assertTask: desired return code: expected=%d, got=%d", *desiredReturnCode, task.DesiredReturnCode.Int64)
+		if !relay.DesiredReturnCode.Valid {
+			return fmt.Errorf("assertRelay: desired return code: got invalid")
+		} else if int(relay.DesiredReturnCode.Int64) != *desiredReturnCode {
+			return fmt.Errorf("assertRelay: desired return code: expected=%d, got=%d", *desiredReturnCode, relay.DesiredReturnCode.Int64)
 		}
 	}
-	if scheduledTime != nil && task.ScheduledTime != *scheduledTime {
-		return fmt.Errorf("assertTask: scheduled time: expected=%s, got=%s", scheduledTime, task.ScheduledTime)
+	if scheduledTime != nil && relay.ScheduledTime != *scheduledTime {
+		return fmt.Errorf("assertRelay: scheduled time: expected=%s, got=%s", scheduledTime, relay.ScheduledTime)
 	}
-	if task.Tries > config.MaxRetries {
-		return fmt.Errorf("assertTask: tries=%d exceeds max tries=%d\n", task.Tries, config.MaxRetries)
+	if relay.Tries > config.MaxRetries {
+		return fmt.Errorf("assertRelay: tries=%d exceeds max tries=%d\n", relay.Tries, config.MaxRetries)
 	}
 	return nil
 }
 
-func generateTask(nSoms int) (string, int, db.TaskStatus) {
-	somNum := rand.Intn(nSoms)
-	somId := fmt.Sprintf("som_%d", somNum)
+func generateRelay(nDevices int) (string, int, db.RelayStatus) {
+	devNum := rand.Intn(nDevices)
+	deviceId := fmt.Sprintf("dev_%d", devNum)
 	drc := rand.Intn(3) + 1
 	if drc == 3 {
-		return somId, drc, db.TaskComplete
+		return deviceId, drc, db.RelayComplete
 	} else {
-		return somId, drc, db.TaskFailed
+		return deviceId, drc, db.RelayFailed
 	}
-	// return &TestTask{
-	//     Id: somNum,
-	//     Status: db.TaskStatus(drc),
-	// }
-	// id, err := client.CreateTask(somId, cloudFunction, argument, &drc, scheduledTime)
 }
 
 func TestIntegration(t *testing.T) {
@@ -75,7 +70,7 @@ func TestIntegration(t *testing.T) {
 		Host:              "localhost",
 		Port:              "8080",
 		MaxRoutines:       3,
-		TaskLimit:         10,
+		RelayLimit:        10,
 		PingRetryDuration: 15 * time.Second,
 		CFRetryDuration:   10 * time.Second,
 		MaxRetries:        3,
@@ -95,46 +90,46 @@ func TestIntegration(t *testing.T) {
 		t.Fatalf("TestIntegration: %+v", err)
 	}
 
-	// Expect an error here for non existant task
-	task, err := client.GetTask(1)
+	// Expect an error here for non existant relay
+	relay, err := client.GetRelay(1)
 	if err == nil {
-		t.Fatalf("TestIntegration: expected an error for non existant task got %+v", task)
+		t.Fatalf("TestIntegration: expected an error for non existant relay got %+v", relay)
 	}
 
 	cloudFunction := "func0"
 	argument := ""
 	var scheduledTime *time.Time = nil
 
-	nTasks := 1000
-	nSoms := 20
-	testTasks := make([]TestTask, nTasks)
+	nRelays := 1000
+	nDevices := 20
+	testRelays := make([]TestRelay, nRelays)
 
 	// TODO: use goroutines to hit multiple requests as faster
-	for i := 0; i < nTasks; i++ {
-		somId, drc, status := generateTask(nSoms)
-		id, err := client.CreateTask(somId, cloudFunction, argument, &drc, scheduledTime)
+	for i := 0; i < nRelays; i++ {
+		deviceId, drc, status := generateRelay(nDevices)
+		id, err := client.CreateRelay(deviceId, cloudFunction, argument, &drc, scheduledTime)
 		if err != nil {
 			t.Fatalf("TestIntegration: %+v", err)
 		}
-		testTasks[i].Id = id
-		testTasks[i].DeviceId = somId
-		testTasks[i].DRC = drc
-		testTasks[i].Status = status
+		testRelays[i].Id = id
+		testRelays[i].DeviceId = deviceId
+		testRelays[i].DRC = drc
+		testRelays[i].Status = status
 	}
 
 	// TODO: add extra routine to spam the service with gets
-	for i := 0; i < nTasks; i++ {
+	for i := 0; i < nRelays; i++ {
 		for {
-			task, err := client.GetTask(testTasks[i].Id)
+			relay, err := client.GetRelay(testRelays[i].Id)
 			if err != nil {
-				t.Logf("TestIntegration: expected an error for non existant task got %+v\n", task)
-			} else if task.Status == db.TaskReady {
+				t.Logf("TestIntegration: expected an error for non existant relay got %+v\n", relay)
+			} else if relay.Status == db.RelayReady {
 				time.Sleep(100 * time.Millisecond)
 				continue
-			} else if task.Status != testTasks[i].Status {
-				t.Fatalf("TestIntegration: task status mismatch, want=%d, got=%d, task=%+v\n", int(testTasks[i].Status), int(task.Status), task)
+			} else if relay.Status != testRelays[i].Status {
+				t.Fatalf("TestIntegration: relay status mismatch, want=%d, got=%d, relay=%+v\n", int(testRelays[i].Status), int(relay.Status), relay)
 			} else {
-				err = assertTask(task, config, testTasks[i].DeviceId, cloudFunction, argument, &testTasks[i].DRC, scheduledTime)
+				err = assertRelay(relay, config, testRelays[i].DeviceId, cloudFunction, argument, &testRelays[i].DRC, scheduledTime)
 				if err != nil {
 					t.Fatalf("TestIntegration: %+v", err)
 				}

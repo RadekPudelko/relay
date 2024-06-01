@@ -21,25 +21,25 @@ func HandleGetRoot() http.Handler {
 	)
 }
 
-func HandleCreateTask(dbConn *sql.DB) http.Handler {
+func HandleCreateRelay(dbConn *sql.DB) http.Handler {
 	return http.HandlerFunc(
 		func(w http.ResponseWriter, r *http.Request) {
-			createTaskHandler(dbConn, w, r)
+			handleCreateRelay(dbConn, w, r)
 		},
 	)
 }
 
-func HandleGetTask(dbConn *sql.DB) http.Handler {
+func HandleGetRelay(dbConn *sql.DB) http.Handler {
 	return http.HandlerFunc(
 		func(w http.ResponseWriter, r *http.Request) {
-			getTaskHandler(dbConn, w, r)
+			handleGetRelay(dbConn, w, r)
 		},
 	)
 }
 
 // TODO: Rename this to something w/o verb
-type CreateTaskRequest struct {
-	SomId             string  `json:"som_id"`
+type CreateRelayRequest struct {
+	DeviceId          string  `json:"device_id"`
 	CloudFunction     string  `json:"cloud_function"`
 	Argument          *string `json:"argument,omitempty"`
 	DesiredReturnCode *int    `json:"desired_return_code,omitempty"`
@@ -47,8 +47,8 @@ type CreateTaskRequest struct {
 	ScheduledTime *time.Time `json:"scheduled_time,omitempty"`
 }
 
-func (p CreateTaskRequest) String() string {
-	str := fmt.Sprintf("som: %s, function: %s", p.SomId, p.CloudFunction)
+func (p CreateRelayRequest) String() string {
+	str := fmt.Sprintf("device: %s, function: %s", p.DeviceId, p.CloudFunction)
 	if p.Argument != nil {
 		str += fmt.Sprintf(", argument: %s", *p.Argument)
 	}
@@ -59,27 +59,27 @@ func (p CreateTaskRequest) String() string {
 }
 
 // TODO: Want to add some sort of id to these logs so that I can know whats going on if there are multiple requests at once
-func createTaskHandler(dbConn *sql.DB, w http.ResponseWriter, r *http.Request) {
+func handleCreateRelay(dbConn *sql.DB, w http.ResponseWriter, r *http.Request) {
 	body, err := io.ReadAll(r.Body)
 	if err != nil {
-		log.Println("createTaskHandler: io.ReadAll:", err)
+		log.Println("handleCreateRelay: io.ReadAll:", err)
 		http.Error(w, "Error reading request body", http.StatusBadRequest)
 		return
 	}
 
-	var req CreateTaskRequest
+	var req CreateRelayRequest
 	err = json.Unmarshal(body, &req)
 	if err != nil {
-		log.Println("createTaskHandler: json.Unmarshal:", err)
+		log.Println("handleCreateRelay: json.Unmarshal:", err)
 		log.Println("request body:", string(body))
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 
-	log.Printf("createTaskHandler: received request body: %s\n", req)
-	if req.SomId == "" || req.CloudFunction == "" {
-		log.Println("createTaskHandler: Atleast one field in the post payload was blank or invalid")
-		http.Error(w, "som_id and cloud_function are required fields",
+	log.Printf("handleCreateRelay: received request body: %s\n", req)
+	if req.DeviceId == "" || req.CloudFunction == "" {
+		log.Println("handleCreateRelay: Atleast one field in the post payload was blank or invalid")
+		http.Error(w, "device_id and cloud_function are required fields",
 			http.StatusUnprocessableEntity)
 		return
 	}
@@ -100,60 +100,60 @@ func createTaskHandler(dbConn *sql.DB, w http.ResponseWriter, r *http.Request) {
 		desiredReturnCode = sql.NullInt64{Int64: int64(*req.DesiredReturnCode), Valid: true}
 	}
 
-	taskId, err := CreateTask(dbConn, req.SomId, req.CloudFunction, argument, desiredReturnCode, scheduledTime)
+	relayId, err := CreateRelay(dbConn, req.DeviceId, req.CloudFunction, argument, desiredReturnCode, scheduledTime)
 	if err != nil {
-		log.Println("createTaskHandler:", err.Error())
+		log.Println("handleCreateRelay:", err.Error())
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	log.Printf("createTaskHandler: new task created, id: %d scheduled for %s\n", taskId, scheduledTime.String())
+	log.Printf("handleCreateRelay: new relay created, id: %d scheduled for %s\n", relayId, scheduledTime.String())
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 	// TODO: Send json?
-	io.WriteString(w, fmt.Sprintf("%d", taskId))
+	io.WriteString(w, fmt.Sprintf("%d", relayId))
 }
 
 func getRoot(w http.ResponseWriter, r *http.Request) {
 	io.WriteString(w, "Hello, HTTP!\n")
 }
 
-func getTaskHandler(dbConn *sql.DB, w http.ResponseWriter, r *http.Request) {
-	taskIdStr := r.PathValue("id")
+func handleGetRelay(dbConn *sql.DB, w http.ResponseWriter, r *http.Request) {
+	relayIdStr := r.PathValue("id")
 
-	if taskIdStr == "" {
-		log.Println("getTaskHandler: missing task id in url: ", r.URL.Path)
-		http.Error(w, "Missing task id", http.StatusBadRequest)
+	if relayIdStr == "" {
+		log.Println("handleGetRelay: missing relay id in url: ", r.URL.Path)
+		http.Error(w, "Missing relay id", http.StatusBadRequest)
 		return
 	}
 
-	taskId, err := strconv.Atoi(taskIdStr)
+	relayId, err := strconv.Atoi(relayIdStr)
 	if err != nil {
-		log.Println("getTaskHandler: invalid task id: ", taskIdStr)
-		http.Error(w, "Invalid task id", http.StatusBadRequest)
+		log.Println("handleGetRelay: invalid relay id: ", relayIdStr)
+		http.Error(w, "Invalid relay id", http.StatusBadRequest)
 		return
 	}
 
-	log.Printf("getTaskHandler: request for task %d\n", taskId)
+	log.Printf("handleGetRelay: request for relay %d\n", relayId)
 
-	task, err := db.SelectTask(dbConn, taskId)
+	relay, err := db.SelectRelay(dbConn, relayId)
 	if err != nil {
-		log.Println("getTaskHandler: ", err)
-		http.Error(w, "Error in getting task", http.StatusInternalServerError)
+		log.Println("handleGetRelay: ", err)
+		http.Error(w, "Error in getting relay", http.StatusInternalServerError)
 		return
 	}
 
-	if task == nil {
-		msg := fmt.Sprintf("getTaskHandler: task %d does not exist", taskId)
+	if relay == nil {
+		msg := fmt.Sprintf("handleGetRelay: relay %d does not exist", relayId)
 		log.Println(msg)
 		http.Error(w, msg, http.StatusBadRequest)
 		return
 	}
 
-	jsonData, err := json.Marshal(task)
+	jsonData, err := json.Marshal(relay)
 	if err != nil {
-		log.Println("getTaskHandler: json.Marshal: ", err)
+		log.Println("handleGetRelay: json.Marshal: ", err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -163,16 +163,16 @@ func getTaskHandler(dbConn *sql.DB, w http.ResponseWriter, r *http.Request) {
 	w.Write(jsonData)
 }
 
-func CreateTask(dbConn *sql.DB, somId string, cloudFunction string, argument string, desiredReturnCode sql.NullInt64, scheduledTime time.Time) (int, error) {
-	somKey, err := db.InsertOrUpdateDevice(dbConn, somId)
+func CreateRelay(dbConn *sql.DB, deviceId string, cloudFunction string, argument string, desiredReturnCode sql.NullInt64, scheduledTime time.Time) (int, error) {
+	deviceKey, err := db.InsertOrUpdateDevice(dbConn, deviceId)
 	if err != nil {
-		return 0, fmt.Errorf("createTaskHandler: %w", err)
+		return 0, fmt.Errorf("CreateRelay: %w", err)
 	}
 
-	taskId, err := db.InsertTask(dbConn, somKey, cloudFunction, argument, desiredReturnCode, scheduledTime)
+	relayId, err := db.InsertRelay(dbConn, deviceKey, cloudFunction, argument, desiredReturnCode, scheduledTime)
 	if err != nil {
-		return 0, fmt.Errorf("CreateTask: %w", err)
+		return 0, fmt.Errorf("CreateRelay: %w", err)
 	}
 
-	return taskId, nil
+	return relayId, nil
 }

@@ -36,33 +36,33 @@ func (c Client) Ping() error {
 	return nil
 }
 
-func (c Client) GetTask(id int) (*db.Task, error) {
-	resp, err := http.Get(fmt.Sprintf("%s/api/tasks/%d", c.url, id))
+func (c Client) GetRelay(id int) (*db.Relay, error) {
+	resp, err := http.Get(fmt.Sprintf("%s/api/relays/%d", c.url, id))
 	if err != nil {
-		return nil, fmt.Errorf("GetTask: http.Get %+w", err)
+		return nil, fmt.Errorf("GetRelay: http.Get %+w", err)
 	}
 	defer resp.Body.Close()
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return nil, fmt.Errorf("GetTask: io.ReadAll %+w", err)
+		return nil, fmt.Errorf("GetRelay: io.ReadAll %+w", err)
 	}
 
 	if resp.StatusCode != 200 {
-		return nil, fmt.Errorf("GetTask: response status: %d, body %s", resp.StatusCode, body)
+		return nil, fmt.Errorf("GetRelay: response status: %d, body %s", resp.StatusCode, body)
 	}
 
-	var task db.Task
-	err = json.Unmarshal(body, &task)
+	var relay db.Relay
+	err = json.Unmarshal(body, &relay)
 	if err != nil {
-		return nil, fmt.Errorf("GetTask: json.Unmarshal: %+w", err)
+		return nil, fmt.Errorf("GetRelay: json.Unmarshal: %+w", err)
 	}
 
-	return &task, nil
+	return &relay, nil
 }
 
-func (c Client) CreateTask(somId string, cloudFunction string, argument string, desiredReturnCode *int, scheduledTime *time.Time) (int, error) {
-	data := server.CreateTaskRequest{
-		SomId:             somId,
+func (c Client) CreateRelay(deviceId string, cloudFunction string, argument string, desiredReturnCode *int, scheduledTime *time.Time) (int, error) {
+	data := server.CreateRelayRequest{
+		DeviceId:          deviceId,
 		CloudFunction:     cloudFunction,
 		Argument:          &argument,
 		DesiredReturnCode: desiredReturnCode,
@@ -71,12 +71,12 @@ func (c Client) CreateTask(somId string, cloudFunction string, argument string, 
 
 	jsonData, err := json.Marshal(data)
 	if err != nil {
-		return 0, fmt.Errorf("CreateTask: json.Marshal: %w", err)
+		return 0, fmt.Errorf("CreateRelay: json.Marshal: %w", err)
 	}
 
-	req, err := http.NewRequest("POST", fmt.Sprintf("%s/api/tasks", c.url), bytes.NewBuffer(jsonData))
+	req, err := http.NewRequest("POST", fmt.Sprintf("%s/api/relays", c.url), bytes.NewBuffer(jsonData))
 	if err != nil {
-		return 0, fmt.Errorf("CreateTask: http.NewRequest: %w", err)
+		return 0, fmt.Errorf("CreateRelay: http.NewRequest: %w", err)
 	}
 
 	req.Header.Set("Content-Type", "application/json")
@@ -84,23 +84,23 @@ func (c Client) CreateTask(somId string, cloudFunction string, argument string, 
 	client := &http.Client{}
 	resp, err := client.Do(req)
 	if err != nil {
-		return 0, fmt.Errorf("CreateTask: client.Do: %w", err)
+		return 0, fmt.Errorf("CreateRelay: client.Do: %w", err)
 	}
 	defer resp.Body.Close()
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return 0, fmt.Errorf("CreateTask: io.ReadAll: %w", err)
+		return 0, fmt.Errorf("CreateRelay: io.ReadAll: %w", err)
 	}
 
 	// Check the response status code
 	if resp.StatusCode != http.StatusOK {
-		return 0, fmt.Errorf("CreateTask: request error, status code=%d, body=%s", resp.StatusCode, body)
+		return 0, fmt.Errorf("CreateRelay: request error, status code=%d, body=%s", resp.StatusCode, body)
 	}
 
 	id, err := strconv.ParseInt(string(body), 10, 64)
 	if err != nil {
-		return 0, fmt.Errorf("CreateTask: strconv.ParseInt: %w on %s", err, string(body))
+		return 0, fmt.Errorf("CreateRelay: strconv.ParseInt: %w on %s", err, string(body))
 	}
 	return int(id), nil
 }
