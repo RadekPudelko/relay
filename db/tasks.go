@@ -9,7 +9,7 @@ import (
 // TODO: decide how to handle nullable vars in marshal/unmarshal
 type Task struct {
 	Id                int           `json:"id"`
-	Som               *Som          `json:"som"`
+	Device            *Device       `json:"device"`
 	CloudFunction     string        `json:"cloud_function"`
 	Argument          string        `json:"argument"`
 	DesiredReturnCode sql.NullInt64 `json:"desired_return_code"`
@@ -19,13 +19,13 @@ type Task struct {
 }
 
 func (t Task) String() string {
-	return fmt.Sprintf("task id: %d, som: %s, function:%s, argument %s", t.Id, t.Som.SomId, t.CloudFunction, t.Argument)
+	return fmt.Sprintf("task id: %d, device: %s, function:%s, argument %s", t.Id, t.Device.DeviceId, t.CloudFunction, t.Argument)
 }
 
-// func NewTask(id int, som *Som, cloudFunction, argument string, desiredReturnCode sql.NullInt64, scheduledTime time.Time, status TaskStatus, tries int) Contact {
+// func NewTask(id int, device *Device, cloudFunction, argument string, desiredReturnCode sql.NullInt64, scheduledTime time.Time, status TaskStatus, tries int) Contact {
 //     return Task {
 //         Id: id,
-//         Som
+//         Device
 //
 //
 //     }
@@ -89,7 +89,7 @@ func SelectTask(db *sql.DB, id int) (*Task, error) {
 		return nil, fmt.Errorf("SelectTask: row.Scan: %w", err)
 	}
 
-	task.Som, err = SelectSom(db, somKey)
+	task.Device, err = SelectDevice(db, somKey)
 	if err != nil {
 		return nil, fmt.Errorf("SelectTask: %w", err)
 	}
@@ -97,7 +97,7 @@ func SelectTask(db *sql.DB, id int) (*Task, error) {
 }
 
 // Select the tasks with desired status between with ids betwween start and end (inclusive) occuring after scheduled time.
-// Max of 1 taks per som is reutrned (WHERE rn = 1)
+// Max of 1 taks per device is reutrned (WHERE rn = 1)
 func SelectTaskIds(db *sql.DB, status TaskStatus, startId, endId, limit *int, scheduledTime time.Time) ([]int, error) {
 	params := []interface{}{status}
 	query := `

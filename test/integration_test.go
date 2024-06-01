@@ -14,7 +14,7 @@ import (
 
 type TestTask struct {
 	Id     int
-	SomId  string
+	DeviceId  string
 	DRC    int
 	Status db.TaskStatus
 }
@@ -28,8 +28,8 @@ func assertTask(
 	desiredReturnCode *int,
 	scheduledTime *time.Time,
 ) error {
-	if task.Som.SomId != somId {
-		return fmt.Errorf("assertTask: somId, expected=%s, got=%s", somId, task.Som.SomId)
+	if task.Device.DeviceId != somId {
+		return fmt.Errorf("assertTask: somId, expected=%s, got=%s", somId, task.Device.DeviceId)
 	}
 	if task.CloudFunction != cloudFunction {
 		return fmt.Errorf("assertTask: cloudFunction, expected=%s, got=%s", cloudFunction, task.CloudFunction)
@@ -117,7 +117,7 @@ func TestIntegration(t *testing.T) {
 			t.Fatalf("TestIntegration: %+v", err)
 		}
 		testTasks[i].Id = id
-		testTasks[i].SomId = somId
+		testTasks[i].DeviceId = somId
 		testTasks[i].DRC = drc
 		testTasks[i].Status = status
 	}
@@ -134,7 +134,7 @@ func TestIntegration(t *testing.T) {
 			} else if task.Status != testTasks[i].Status {
 				t.Fatalf("TestIntegration: task status mismatch, want=%d, got=%d, task=%+v\n", int(testTasks[i].Status), int(task.Status), task)
 			} else {
-				err = assertTask(task, config, testTasks[i].SomId, cloudFunction, argument, &testTasks[i].DRC, scheduledTime)
+				err = assertTask(task, config, testTasks[i].DeviceId, cloudFunction, argument, &testTasks[i].DRC, scheduledTime)
 				if err != nil {
 					t.Fatalf("TestIntegration: %+v", err)
 				}

@@ -164,7 +164,7 @@ func getTaskHandler(dbConn *sql.DB, w http.ResponseWriter, r *http.Request) {
 }
 
 func CreateTask(dbConn *sql.DB, somId string, cloudFunction string, argument string, desiredReturnCode sql.NullInt64, scheduledTime time.Time) (int, error) {
-	somKey, err := db.InsertOrUpdateSom(dbConn, somId)
+	somKey, err := db.InsertOrUpdateDevice(dbConn, somId)
 	if err != nil {
 		return 0, fmt.Errorf("createTaskHandler: %w", err)
 	}

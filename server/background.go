@@ -15,7 +15,7 @@ import (
 func BackgroundTask(config Config, dbConn *sql.DB, particle particle.ParticleAPI) {
 	var sem = make(chan int, config.MaxRoutines)
 	lastTaskId := 0
-	lastNTasks := 0
+	lastNTasks := -1
 	for true {
 		// Get ready tasks, starting from the lastTaskId, limited 1 per som
 		// This implementation does not care about the order of tasks
@@ -63,43 +63,43 @@ func processTask(config Config, dbConn *sql.DB, particle particle.ParticleAPI, i
 	// Consider pinging a som if its been more than n seconds since last check
 	// TODO: define a config for how long a last ping is valid for
 	// TODO: update online time on good communication from cf
-	if !task.Som.LastOnline.Valid || time.Since(task.Som.LastOnline.Time) > config.PingRetryDuration {
+	if !task.Device.LastOnline.Valid || time.Since(task.Device.LastOnline.Time) > config.PingRetryDuration {
 		// Only ping a som if we have not pinged in n seconds
-		if task.Som.LastPing.Valid && time.Since(task.Som.LastPing.Time) < config.PingRetryDuration {
-			log.Printf("processTask: id=%d, om %s is not online, skipping\n", id, task.Som.SomId)
+		if task.Device.LastPing.Valid && time.Since(task.Device.LastPing.Time) < config.PingRetryDuration {
+			log.Printf("processTask: id=%d, om %s is not online, skipping\n", id, task.Device.DeviceId)
 			return
 		}
-		log.Printf("processTask: id=%d, pinging som %s\n", id, task.Som.SomId)
-		online, err := particle.Ping(task.Som.SomId)
+		log.Printf("processTask: id=%d, pinging som %s\n", id, task.Device.DeviceId)
+		online, err := particle.Ping(task.Device.DeviceId)
 		now := sql.NullTime{Time: time.Now(), Valid: true}
 		if err != nil {
 			log.Printf("processTask: id=%d, %+v\n", id, err)
-			err = db.UpdateSom(dbConn, task.Som.Id, task.Som.LastOnline, now)
+			err = db.UpdateDevice(dbConn, task.Device.Id, task.Device.LastOnline, now)
 			if err != nil {
 				log.Printf("processTask: id=%d, %+v\n", id, err)
 			}
 			return
 		}
 		if !online {
-			log.Printf("processTask: id=%d, som %s is offline\n", id, task.Som.SomId)
-			err = db.UpdateSom(dbConn, task.Som.Id, task.Som.LastOnline, now)
+			log.Printf("processTask: id=%d, som %s is offline\n", id, task.Device.DeviceId)
+			err = db.UpdateDevice(dbConn, task.Device.Id, task.Device.LastOnline, now)
 			// TODO: This and many places like this should never fail, so should the server crash here??
 			if err != nil {
 				log.Printf("processTask: id=%d, %+v\n", id, err)
 			}
 			return
 		}
-		err = db.UpdateSom(dbConn, task.Som.Id, now, now)
+		err = db.UpdateDevice(dbConn, task.Device.Id, now, now)
 		if err != nil {
 			log.Printf("processTask: id=%d, %+v\n", id, err)
 			return
 		}
 	}
 
-	log.Printf("processTask: id=%d, som %s is online\n", id, task.Som.SomId)
+	log.Printf("processTask: id=%d, som %s is online\n", id, task.Device.DeviceId)
 	// TODO: may want to get return value from function
 	// TODO: may want to add some way to store error history in the database
-	success, err := particle.CloudFunction(task.Som.SomId, task.CloudFunction, task.Argument, task.DesiredReturnCode)
+	success, err := particle.CloudFunction(task.Device.DeviceId, task.CloudFunction, task.Argument, task.DesiredReturnCode)
 	later := time.Now().Add(config.CFRetryDuration).UTC()
 	if err != nil {
 		log.Printf("processTask: id=%d, tries=%d, %+v", id, task.Tries, err)

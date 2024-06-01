@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+    "time"
 
 	"github.com/joho/godotenv"
 	"relay/db"
@@ -21,12 +22,16 @@ func main() {
 }
 
 func run() error {
+
+
 	config := server.Config{
-		Host:        "localhost",
-		Port:        "8080",
-		MaxRoutines: 2,
-		TaskLimit:   10,
-		MaxRetries:  3,
+		Host:              "localhost",
+		Port:              "8080",
+		MaxRoutines:       3,
+		TaskLimit:         10,
+		PingRetryDuration: 600 * time.Second,
+		CFRetryDuration:   600 * time.Second,
+		MaxRetries:        3,
 	}
 
 	err := godotenv.Load(".env")

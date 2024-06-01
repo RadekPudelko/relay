@@ -8,7 +8,7 @@ import (
 )
 
 func CreateTables(db *sql.DB) error {
-	err := CreateSomsTable(db)
+	err := CreateDevicesTable(db)
 	if err != nil {
 		return fmt.Errorf("SetupDatabase: %w", err)
 	}
@@ -19,9 +19,9 @@ func CreateTables(db *sql.DB) error {
 	return nil
 }
 
-func CreateSomsTable(db *sql.DB) error {
+func CreateDevicesTable(db *sql.DB) error {
 	const create string = `
-         CREATE TABLE IF NOT EXISTS soms (
+         CREATE TABLE IF NOT EXISTS devices (
          id INTEGER PRIMARY KEY AUTOINCREMENT,
          som_id TEXT UNIQUE NOT NULL,
          last_online DATETIME NULL,
@@ -46,7 +46,7 @@ func CreateTasksTable(db *sql.DB) error {
         scheduled_time DATETIME NOT NULL,
         status INTEGER NOT NULL,
         tries INTEGER NOT NULL,
-        FOREIGN KEY(som_key) REFERENCES soms(id)
+        FOREIGN KEY(som_key) REFERENCES devices(id)
         )`
 	_, err := db.Exec(create)
 	if err != nil {
