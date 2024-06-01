@@ -8,9 +8,9 @@ import (
 	"time"
 
 	"github.com/joho/godotenv"
-	"relay/db"
-	"relay/particle"
-	"relay/server"
+	"relay/internal/database"
+	"relay/internal/particle"
+	"relay/internal/server"
 )
 
 func main() {
@@ -63,12 +63,12 @@ func run() error {
 
 // TODO: move this somewhere else
 func SetupDB(path string) (*sql.DB, error) {
-	dbConn, err := db.Connect(path)
+	dbConn, err := database.Connect(path)
 	if err != nil {
 		return nil, fmt.Errorf("SetupDB: %w", err)
 	}
 
-	err = db.CreateTables(dbConn)
+	err = database.CreateTables(dbConn)
 	if err != nil {
 		dbConn.Close()
 		return nil, fmt.Errorf("SetupDB: %w", err)

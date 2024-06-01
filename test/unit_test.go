@@ -7,8 +7,9 @@ import (
 	"testing"
 	"time"
 
-	"relay/db"
-	"relay/server"
+	"relay/internal/database"
+	"relay/internal/models"
+	"relay/internal/server"
 )
 
 func testCreateRelay(dbConn *sql.DB, relayId string, cloudFunction string, argument string, desiredReturnCode sql.NullInt64, scheduledTime0 time.Time) (int, error) {
@@ -17,7 +18,7 @@ func testCreateRelay(dbConn *sql.DB, relayId string, cloudFunction string, argum
 		return 0, fmt.Errorf("testCreateRelay: %w", err)
 	}
 
-	relay, err := db.SelectRelay(dbConn, id)
+	relay, err := models.SelectRelay(dbConn, id)
 	if err != nil {
 		return 0, fmt.Errorf("testCreateRelay: %w", err)
 	}
@@ -41,13 +42,13 @@ func testCreateRelay(dbConn *sql.DB, relayId string, cloudFunction string, argum
 }
 
 func TestCreateRelays(t *testing.T) {
-	dbConn, err := db.Connect("file::memory:?cache=shared")
+	dbConn, err := database.Connect("file::memory:?cache=shared")
 	if err != nil {
 		t.Fatalf("TestCreateRelays: %+v", err)
 	}
 	defer dbConn.Close()
 
-	err = db.CreateTables(dbConn)
+	err = database.CreateTables(dbConn)
 	if err != nil {
 		t.Fatalf("TestCreateRelays: %+v", err)
 	}
@@ -85,7 +86,7 @@ func TestCreateRelays(t *testing.T) {
 	}
 }
 
-func createCustomRelay(dbConn *sql.DB, relayId string, cloudFunction, argument string, desiredReturnCode sql.NullInt64, timeStr string, status db.RelayStatus) (int, error) {
+func createCustomRelay(dbConn *sql.DB, relayId string, cloudFunction, argument string, desiredReturnCode sql.NullInt64, timeStr string, status models.RelayStatus) (int, error) {
 	layout := "2006-01-02 15:04:05.999999-07:00"
 	scheduledTime, err := time.Parse(layout, timeStr)
 	if err != nil {
@@ -97,7 +98,7 @@ func createCustomRelay(dbConn *sql.DB, relayId string, cloudFunction, argument s
 	if err != nil {
 		return 0, fmt.Errorf("createCustomRelay: %w", err)
 	}
-	err = db.UpdateRelay(dbConn, tid, scheduledTime, status, 1)
+	err = models.UpdateRelay(dbConn, tid, scheduledTime, status, 1)
 	if err != nil {
 		return 0, fmt.Errorf("createCustomRelay: %w", err)
 	}
@@ -147,13 +148,13 @@ func TestGetReadyRelays(t *testing.T) {
 	if err != nil {
 		t.Fatalf("TestGetReadyRelays: %+v", err)
 	}
-	dbConn, err := db.Connect(testDBPath + "?cache=shared")
+	dbConn, err := database.Connect(testDBPath + "?cache=shared")
 	if err != nil {
 		t.Fatalf("TestGetReadyRelays: %+v", err)
 	}
 	defer dbConn.Close()
 
-	err = db.CreateTables(dbConn)
+	err = database.CreateTables(dbConn)
 	if err != nil {
 		t.Fatalf("TestGetReadyRelays: %+v", err)
 	}
@@ -173,7 +174,7 @@ func TestGetReadyRelays(t *testing.T) {
 	}
 
 	// dev0
-	t0, err := createCustomRelay(dbConn, relayId, cloudFunction, argument, desiredReturnCode, timeStr0, db.RelayReady)
+	t0, err := createCustomRelay(dbConn, relayId, cloudFunction, argument, desiredReturnCode, timeStr0, models.RelayReady)
 	if err != nil {
 		t.Fatalf("TestGetReadyRelays: %+v", err)
 	}
@@ -184,7 +185,7 @@ func TestGetReadyRelays(t *testing.T) {
 
 	// dev1
 	relayId = "dev1"
-	t1, err := createCustomRelay(dbConn, relayId, cloudFunction, argument, desiredReturnCode, timeStr0, db.RelayReady)
+	t1, err := createCustomRelay(dbConn, relayId, cloudFunction, argument, desiredReturnCode, timeStr0, models.RelayReady)
 	if err != nil {
 		t.Fatalf("TestGetReadyRelays: %+v", err)
 	}
@@ -204,7 +205,7 @@ func TestGetReadyRelays(t *testing.T) {
 
 	// dev1, func1
 	cloudFunction = "func1"
-	t2, err := createCustomRelay(dbConn, relayId, cloudFunction, argument, desiredReturnCode, timeStr0, db.RelayReady)
+	t2, err := createCustomRelay(dbConn, relayId, cloudFunction, argument, desiredReturnCode, timeStr0, models.RelayReady)
 	if err != nil {
 		t.Fatalf("TestGetReadyRelays: %+v", err)
 	}
@@ -214,7 +215,7 @@ func TestGetReadyRelays(t *testing.T) {
 	}
 
 	// dev1, func1, complete
-	t3, err := createCustomRelay(dbConn, relayId, cloudFunction, argument, desiredReturnCode, timeStr0, db.RelayComplete)
+	t3, err := createCustomRelay(dbConn, relayId, cloudFunction, argument, desiredReturnCode, timeStr0, models.RelayComplete)
 	if err != nil {
 		t.Fatalf("TestGetReadyRelays: %+v", err)
 	}
@@ -225,7 +226,7 @@ func TestGetReadyRelays(t *testing.T) {
 
 	// dev0, func1, failed
 	relayId = "dev0"
-	t4, err := createCustomRelay(dbConn, relayId, cloudFunction, argument, desiredReturnCode, timeStr0, db.RelayFailed)
+	t4, err := createCustomRelay(dbConn, relayId, cloudFunction, argument, desiredReturnCode, timeStr0, models.RelayFailed)
 	if err != nil {
 		t.Fatalf("TestGetReadyRelays: %+v", err)
 	}
@@ -235,7 +236,7 @@ func TestGetReadyRelays(t *testing.T) {
 	}
 
 	// dev0, func1, ready
-	t5, err := createCustomRelay(dbConn, relayId, cloudFunction, argument, desiredReturnCode, timeStr0, db.RelayReady)
+	t5, err := createCustomRelay(dbConn, relayId, cloudFunction, argument, desiredReturnCode, timeStr0, models.RelayReady)
 	if err != nil {
 		t.Fatalf("TestGetReadyRelays: %+v", err)
 	}
@@ -250,7 +251,7 @@ func TestGetReadyRelays(t *testing.T) {
 
 	// dev2, func1, ready
 	relayId = "dev2"
-	t6, err := createCustomRelay(dbConn, relayId, cloudFunction, argument, desiredReturnCode, timeStr0, db.RelayReady)
+	t6, err := createCustomRelay(dbConn, relayId, cloudFunction, argument, desiredReturnCode, timeStr0, models.RelayReady)
 	if err != nil {
 		t.Fatalf("TestGetReadyRelays: %+v", err)
 	}
@@ -261,7 +262,7 @@ func TestGetReadyRelays(t *testing.T) {
 
 	// dev2, func2, ready
 	cloudFunction = "func2"
-	t7, err := createCustomRelay(dbConn, relayId, cloudFunction, argument, desiredReturnCode, timeStr0, db.RelayReady)
+	t7, err := createCustomRelay(dbConn, relayId, cloudFunction, argument, desiredReturnCode, timeStr0, models.RelayReady)
 	if err != nil {
 		t.Fatalf("TestGetReadyRelays: %+v", err)
 	}
@@ -273,7 +274,7 @@ func TestGetReadyRelays(t *testing.T) {
 	// dev0, func2, ready, in the future
 	relayId = "dev3"
 	timeStr1 := "2025-05-14 20:17:32.897647+00:00"
-	t8, err := createCustomRelay(dbConn, relayId, cloudFunction, argument, desiredReturnCode, timeStr1, db.RelayReady)
+	t8, err := createCustomRelay(dbConn, relayId, cloudFunction, argument, desiredReturnCode, timeStr1, models.RelayReady)
 
 	if err != nil {
 		t.Fatalf("TestGetReadyRelays: %+v", err)

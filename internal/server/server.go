@@ -7,8 +7,8 @@ import (
 	"net/http"
 	"os"
 
-	"relay/middleware"
-	"relay/particle"
+	"relay/internal/middleware"
+	"relay/internal/particle"
 )
 
 func NewServer(dbConn *sql.DB) http.Handler {

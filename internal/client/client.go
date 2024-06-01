@@ -9,8 +9,8 @@ import (
 	"strconv"
 	"time"
 
-	"relay/db"
-	"relay/server"
+	"relay/internal/models"
+	"relay/internal/server"
 )
 
 type Client struct {
@@ -36,7 +36,7 @@ func (c Client) Ping() error {
 	return nil
 }
 
-func (c Client) GetRelay(id int) (*db.Relay, error) {
+func (c Client) GetRelay(id int) (*models.Relay, error) {
 	resp, err := http.Get(fmt.Sprintf("%s/api/relays/%d", c.url, id))
 	if err != nil {
 		return nil, fmt.Errorf("GetRelay: http.Get %+w", err)
@@ -51,7 +51,7 @@ func (c Client) GetRelay(id int) (*db.Relay, error) {
 		return nil, fmt.Errorf("GetRelay: response status: %d, body %s", resp.StatusCode, body)
 	}
 
-	var relay db.Relay
+	var relay models.Relay
 	err = json.Unmarshal(body, &relay)
 	if err != nil {
 		return nil, fmt.Errorf("GetRelay: json.Unmarshal: %+w", err)

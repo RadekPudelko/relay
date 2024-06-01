@@ -7,8 +7,8 @@ import (
 	"sync"
 	"time"
 
-	"relay/db"
-	"relay/particle"
+	"relay/internal/models"
+	"relay/internal/particle"
 )
 
 // TODO make backgroundTask sleep when there are no relays, wake by new relay post?
@@ -55,7 +55,7 @@ func BackgroundTask(config Config, dbConn *sql.DB, particle particle.ParticleAPI
 
 // TODO: Update the schedule time of the relay if its been recently pinged and offline, ping fails or device is offile
 func processRelay(config Config, dbConn *sql.DB, particle particle.ParticleAPI, id int) {
-	relay, err := db.SelectRelay(dbConn, id)
+	relay, err := models.SelectRelay(dbConn, id)
 	if err != nil {
 		log.Printf("processRelay: id=%d, %+v\n", id, err)
 		return
@@ -74,7 +74,7 @@ func processRelay(config Config, dbConn *sql.DB, particle particle.ParticleAPI, 
 		now := sql.NullTime{Time: time.Now(), Valid: true}
 		if err != nil {
 			log.Printf("processRelay: id=%d, %+v\n", id, err)
-			err = db.UpdateDevice(dbConn, relay.Device.Id, relay.Device.LastOnline, now)
+			err = models.UpdateDevice(dbConn, relay.Device.Id, relay.Device.LastOnline, now)
 			if err != nil {
 				log.Printf("processRelay: id=%d, %+v\n", id, err)
 			}
@@ -82,14 +82,14 @@ func processRelay(config Config, dbConn *sql.DB, particle particle.ParticleAPI, 
 		}
 		if !online {
 			log.Printf("processRelay: id=%d, device %s is offline\n", id, relay.Device.DeviceId)
-			err = db.UpdateDevice(dbConn, relay.Device.Id, relay.Device.LastOnline, now)
+			err = models.UpdateDevice(dbConn, relay.Device.Id, relay.Device.LastOnline, now)
 			// TODO: This and many places like this should never fail, so should the server crash here??
 			if err != nil {
 				log.Printf("processRelay: id=%d, %+v\n", id, err)
 			}
 			return
 		}
-		err = db.UpdateDevice(dbConn, relay.Device.Id, now, now)
+		err = models.UpdateDevice(dbConn, relay.Device.Id, now, now)
 		if err != nil {
 			log.Printf("processRelay: id=%d, %+v\n", id, err)
 			return
@@ -105,10 +105,10 @@ func processRelay(config Config, dbConn *sql.DB, particle particle.ParticleAPI, 
 		log.Printf("processRelay: id=%d, tries=%d, %+v", id, relay.Tries, err)
 		if relay.Tries >= config.MaxRetries-1 { // start from 0
 			log.Printf("processRelay: id=%d has failed due to max failed tries\n", id)
-			err = db.UpdateRelay(dbConn, id, relay.ScheduledTime, db.RelayFailed, relay.Tries+1)
+			err = models.UpdateRelay(dbConn, id, relay.ScheduledTime, models.RelayFailed, relay.Tries+1)
 		} else {
 			log.Printf("processRelay: id=%d has failed, try again at %s\n", id, later)
-			err = db.UpdateRelay(dbConn, id, later, db.RelayReady, relay.Tries+1)
+			err = models.UpdateRelay(dbConn, id, later, models.RelayReady, relay.Tries+1)
 		}
 		if err != nil {
 			log.Printf("processRelay: relay=%d, %+v\n", id, err)
@@ -119,10 +119,10 @@ func processRelay(config Config, dbConn *sql.DB, particle particle.ParticleAPI, 
 
 	if !success {
 		log.Printf("processRelay: id=%d has failed due to mismatch in returned code\n", id)
-		err = db.UpdateRelay(dbConn, id, relay.ScheduledTime, db.RelayFailed, relay.Tries+1)
+		err = models.UpdateRelay(dbConn, id, relay.ScheduledTime, models.RelayFailed, relay.Tries+1)
 	} else {
 		log.Printf("processRelay: id=%d, success\n", id)
-		err = db.UpdateRelay(dbConn, id, relay.ScheduledTime, db.RelayComplete, relay.Tries+1)
+		err = models.UpdateRelay(dbConn, id, relay.ScheduledTime, models.RelayComplete, relay.Tries+1)
 	}
 	if err != nil {
 		log.Printf("processRelay: relay=%d, %+v\n", id, err)
@@ -131,7 +131,7 @@ func processRelay(config Config, dbConn *sql.DB, particle particle.ParticleAPI, 
 
 // Queries for upto limit relays in the db that are scheduled after scheduled time from id to id - 1 (inclusive)
 func GetReadyRelays(dbConn *sql.DB, id, limit int, scheduledTime time.Time) ([]int, error) {
-	relayIds, err := db.SelectRelayIds(dbConn, db.RelayReady, &id, nil, &limit, scheduledTime)
+	relayIds, err := models.SelectRelayIds(dbConn, models.RelayReady, &id, nil, &limit, scheduledTime)
 	if err != nil {
 		return nil, fmt.Errorf("GetReadyRelays for %d onward: %w", id+1, err)
 	}

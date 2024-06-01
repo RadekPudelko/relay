@@ -6,7 +6,7 @@ import (
 
 	"github.com/joho/godotenv"
 
-	"relay/client"
+	"relay/internal/client"
 )
 
 func main() {

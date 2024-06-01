@@ -6,21 +6,21 @@ import (
 	"testing"
 	"time"
 
-	"relay/client"
-	"relay/db"
-	"relay/server"
-	// "relay/particle"
+	"relay/internal/client"
+	"relay/internal/models"
+	"relay/internal/server"
+	// "relay/internal/particle"
 )
 
 type TestRelay struct {
 	Id       int
 	DeviceId string
 	DRC      int
-	Status   db.RelayStatus
+	Status   models.RelayStatus
 }
 
 func assertRelay(
-	relay *db.Relay,
+	relay *models.Relay,
 	config server.Config,
 	deviceId string,
 	cloudFunction string,
@@ -53,14 +53,14 @@ func assertRelay(
 	return nil
 }
 
-func generateRelay(nDevices int) (string, int, db.RelayStatus) {
+func generateRelay(nDevices int) (string, int, models.RelayStatus) {
 	devNum := rand.Intn(nDevices)
 	deviceId := fmt.Sprintf("dev_%d", devNum)
 	drc := rand.Intn(3) + 1
 	if drc == 3 {
-		return deviceId, drc, db.RelayComplete
+		return deviceId, drc, models.RelayComplete
 	} else {
-		return deviceId, drc, db.RelayFailed
+		return deviceId, drc, models.RelayFailed
 	}
 }
 
@@ -123,7 +123,7 @@ func TestIntegration(t *testing.T) {
 			relay, err := client.GetRelay(testRelays[i].Id)
 			if err != nil {
 				t.Logf("TestIntegration: expected an error for non existant relay got %+v\n", relay)
-			} else if relay.Status == db.RelayReady {
+			} else if relay.Status == models.RelayReady {
 				time.Sleep(100 * time.Millisecond)
 				continue
 			} else if relay.Status != testRelays[i].Status {

@@ -1,4 +1,4 @@
-package db
+package models
 
 import (
 	"database/sql"
@@ -69,11 +69,11 @@ const (
 // 	return json.Marshal(n.String)
 // }
 
-func SelectRelay(db *sql.DB, id int) (*Relay, error) {
+func SelectRelay(models *sql.DB, id int) (*Relay, error) {
 	const query string = `SELECT * FROM relays WHERE id = ?`
-	stmt, err := db.Prepare(query)
+	stmt, err := models.Prepare(query)
 	if err != nil {
-		return nil, fmt.Errorf("SelectRelay: db.Prepare: %w", err)
+		return nil, fmt.Errorf("SelectRelay: models.Prepare: %w", err)
 	}
 	defer stmt.Close()
 	// TODO: Apply this approach to other single row reads
@@ -89,7 +89,7 @@ func SelectRelay(db *sql.DB, id int) (*Relay, error) {
 		return nil, fmt.Errorf("SelectRelay: row.Scan: %w", err)
 	}
 
-	relay.Device, err = SelectDevice(db, deviceKey)
+	relay.Device, err = SelectDevice(models, deviceKey)
 	if err != nil {
 		return nil, fmt.Errorf("SelectRelay: %w", err)
 	}
@@ -98,7 +98,7 @@ func SelectRelay(db *sql.DB, id int) (*Relay, error) {
 
 // Select the relays with desired status between with ids betwween start and end (inclusive) occuring after scheduled time.
 // Max of 1 taks per device is reutrned (WHERE rn = 1)
-func SelectRelayIds(db *sql.DB, status RelayStatus, startId, endId, limit *int, scheduledTime time.Time) ([]int, error) {
+func SelectRelayIds(models *sql.DB, status RelayStatus, startId, endId, limit *int, scheduledTime time.Time) ([]int, error) {
 	params := []interface{}{status}
 	query := `
         SELECT MIN(id)
@@ -125,9 +125,9 @@ func SelectRelayIds(db *sql.DB, status RelayStatus, startId, endId, limit *int, 
 	// fmt.Println(query)
 	// fmt.Println(params)
 
-	stmt, err := db.Prepare(query)
+	stmt, err := models.Prepare(query)
 	if err != nil {
-		return nil, fmt.Errorf("SelectRelayIds: db.Prepare: %w", err)
+		return nil, fmt.Errorf("SelectRelayIds: models.Prepare: %w", err)
 	}
 	defer stmt.Close()
 
@@ -169,15 +169,15 @@ func SelectRelayIds(db *sql.DB, status RelayStatus, startId, endId, limit *int, 
 	return relayIds, nil
 }
 
-func InsertRelay(db *sql.DB, deviceKey int, cloudFunction string, argument string, desiredReturnCode sql.NullInt64, scheduledTime time.Time) (int, error) {
+func InsertRelay(models *sql.DB, deviceKey int, cloudFunction string, argument string, desiredReturnCode sql.NullInt64, scheduledTime time.Time) (int, error) {
 	const query string = `
         INSERT INTO relays
         (device_key, cloud_function, argument, desired_return_code, scheduled_time, status, tries)
         VALUES (?, ?, ?, ?, ?, ?, ?)
         `
-	stmt, err := db.Prepare(query)
+	stmt, err := models.Prepare(query)
 	if err != nil {
-		return 0, fmt.Errorf("InsertDevice: db.Prepare: %w", err)
+		return 0, fmt.Errorf("InsertDevice: models.Prepare: %w", err)
 	}
 	defer stmt.Close()
 
@@ -192,15 +192,15 @@ func InsertRelay(db *sql.DB, deviceKey int, cloudFunction string, argument strin
 	return int(id), nil
 }
 
-func UpdateRelay(db *sql.DB, relayId int, scheduledTime time.Time, status RelayStatus, tries int) error {
+func UpdateRelay(models *sql.DB, relayId int, scheduledTime time.Time, status RelayStatus, tries int) error {
 	const query string = `
         UPDATE relays
         SET status = ?, tries = ?, scheduled_time = ?
         WHERE id = ?
         `
-	stmt, err := db.Prepare(query)
+	stmt, err := models.Prepare(query)
 	if err != nil {
-		return fmt.Errorf("UpdateRelay: db.Prepare: %w", err)
+		return fmt.Errorf("UpdateRelay: models.Prepare: %w", err)
 	}
 	defer stmt.Close()
 

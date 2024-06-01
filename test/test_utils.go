@@ -4,9 +4,9 @@ import (
 	"fmt"
 	"os"
 
-	"relay/db"
-	"relay/particle"
-	"relay/server"
+	"relay/internal/database"
+	"relay/internal/particle"
+	"relay/internal/server"
 )
 
 func runTestServer(config server.Config) error {
@@ -30,7 +30,7 @@ func runTestServer(config server.Config) error {
 	// testDBPath += "?cache=shared?_busy_timeout=5000"
 	testDBPath += "?cache=shared"
 
-	dbConn, err := db.Connect(testDBPath)
+	dbConn, err := database.Connect(testDBPath)
 	if err != nil {
 		return fmt.Errorf("run: %w", err)
 	}
@@ -52,7 +52,7 @@ func runTestServer(config server.Config) error {
 		return fmt.Errorf("run: expected wal mode")
 	}
 
-	err = db.CreateTables(dbConn)
+	err = database.CreateTables(dbConn)
 	if err != nil {
 		return fmt.Errorf("run: %w", err)
 	}

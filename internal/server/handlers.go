@@ -10,7 +10,7 @@ import (
 	"strconv"
 	"time"
 
-	"relay/db"
+	"relay/internal/models"
 )
 
 func HandleGetRoot() http.Handler {
@@ -137,7 +137,7 @@ func handleGetRelay(dbConn *sql.DB, w http.ResponseWriter, r *http.Request) {
 
 	log.Printf("handleGetRelay: request for relay %d\n", relayId)
 
-	relay, err := db.SelectRelay(dbConn, relayId)
+	relay, err := models.SelectRelay(dbConn, relayId)
 	if err != nil {
 		log.Println("handleGetRelay: ", err)
 		http.Error(w, "Error in getting relay", http.StatusInternalServerError)
@@ -164,12 +164,12 @@ func handleGetRelay(dbConn *sql.DB, w http.ResponseWriter, r *http.Request) {
 }
 
 func CreateRelay(dbConn *sql.DB, deviceId string, cloudFunction string, argument string, desiredReturnCode sql.NullInt64, scheduledTime time.Time) (int, error) {
-	deviceKey, err := db.InsertOrUpdateDevice(dbConn, deviceId)
+	deviceKey, err := models.InsertOrUpdateDevice(dbConn, deviceId)
 	if err != nil {
 		return 0, fmt.Errorf("CreateRelay: %w", err)
 	}
 
-	relayId, err := db.InsertRelay(dbConn, deviceKey, cloudFunction, argument, desiredReturnCode, scheduledTime)
+	relayId, err := models.InsertRelay(dbConn, deviceKey, cloudFunction, argument, desiredReturnCode, scheduledTime)
 	if err != nil {
 		return 0, fmt.Errorf("CreateRelay: %w", err)
 	}
