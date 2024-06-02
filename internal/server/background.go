@@ -17,7 +17,7 @@ func BackgroundTask(config Config, dbConn *sql.DB, particle particle.ParticleAPI
 	lastRelayId := 0
 	lastNRelays := -1
 	for true {
-        err := handleCancellations(dbConn)
+        err := ProcessCancellations(dbConn)
         if err != nil {
             // Fatal?
 			log.Fatal("backgroundTask: ", err)
@@ -61,12 +61,12 @@ func BackgroundTask(config Config, dbConn *sql.DB, particle particle.ParticleAPI
 	}
 }
 
-func handleCancellations(dbConn *sql.DB) (error) {
+func ProcessCancellations(dbConn *sql.DB) (error) {
     // Handle cancellations 100 at a time until they are all processed
     for {
         cancellations, err := models.SelectCancellations(dbConn, 100)
         if err != nil {
-            return fmt.Errorf("handleCancellations: %w", err)
+            return fmt.Errorf("ProcessCancellations: %w", err)
         }
         if len(cancellations) == 0 {
             return nil
@@ -74,11 +74,11 @@ func handleCancellations(dbConn *sql.DB) (error) {
         for _, cancellation := range(cancellations) {
             err := models.UpdateRelayStatus(dbConn, cancellation.RelayId, models.RelayCancelled)
             if err != nil {
-                return fmt.Errorf("handleCancellations: %w on cancellation %+v", err, cancellation)
+                return fmt.Errorf("ProcessCancellations: %w on cancellation %+v", err, cancellation)
             }
             err = models.DeleteCancellation(dbConn, cancellation.Id)
             if err != nil {
-                return fmt.Errorf("handleCancellations: %w on cancellation %+v", err, cancellation)
+                return fmt.Errorf("ProcessCancellations: %w on cancellation %+v", err, cancellation)
             }
         }
     }

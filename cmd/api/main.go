@@ -22,7 +22,6 @@ func main() {
 }
 
 func run() error {
-
 	config := server.Config{
 		Host:              "localhost",
 		Port:              "8080",
@@ -51,27 +50,14 @@ func run() error {
 	if particleToken == "" {
 		log.Fatalf("run: missing PARTICLE_TOKEN in .env file")
 	}
-	dbConn, err := SetupDB(dbPath)
+	dbConn, err := database.Setup(dbPath, true)
 	if err != nil {
 		log.Fatal("run: %w", err)
 	}
 	defer dbConn.Close()
 
-	err = server.Run(config, dbConn, particle)
+	go server.BackgroundTask(config, dbConn, particle)
+	err = server.Run(config, dbConn)
 	return nil
 }
 
-// TODO: move this somewhere else
-func SetupDB(path string) (*sql.DB, error) {
-	dbConn, err := database.Connect(path)
-	if err != nil {
-		return nil, fmt.Errorf("SetupDB: %w", err)
-	}
-
-	err = database.CreateTables(dbConn)
-	if err != nil {
-		dbConn.Close()
-		return nil, fmt.Errorf("SetupDB: %w", err)
-	}
-	return dbConn, nil
-}

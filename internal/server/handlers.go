@@ -13,7 +13,6 @@ import (
 	"relay/internal/models"
 )
 
-
 // TODO: Rename this to something w/o verb
 type CreateRelayRequest struct {
 	DeviceId          string  `json:"device_id"`
@@ -110,13 +109,14 @@ func HandleCreateRelay(dbConn *sql.DB) http.Handler {
 func HandleCancelRelay(dbConn *sql.DB) http.Handler {
 	return http.HandlerFunc(
 		func(w http.ResponseWriter, r *http.Request) {
-			handleCreateRelay(dbConn, w, r)
+			handleCancelRelay(dbConn, w, r)
 		},
 	)
 }
 
 func handleCancelRelay(dbConn *sql.DB, w http.ResponseWriter, r *http.Request) {
 	relayIdStr := r.PathValue("id")
+    log.Println("sadf: ", relayIdStr)
 
 	if relayIdStr == "" {
 		log.Println("handleCancelRelay: missing relay id in url: ", r.URL.Path)
@@ -141,13 +141,13 @@ func handleCancelRelay(dbConn *sql.DB, w http.ResponseWriter, r *http.Request) {
 	}
 
     if relay == nil {
-		log.Println("handleCancelRelay: relay id=%d does not exist", relayId)
+		log.Printf("handleCancelRelay: relay id=%d does not exist\n", relayId)
 		http.Error(w, fmt.Sprintf("Relay %d does not exist", relayId), http.StatusUnprocessableEntity)
 		return
     }
 
     if relay.Status != models.RelayReady {
-        log.Println("handleCancelRelay: relay id=%d is not cancellatble, status=%d", relayId, relay.Status)
+        log.Printf("handleCancelRelay: relay id=%d is not cancellatble, status=%d\n", relayId, relay.Status)
         if relay.Status == models.RelayFailed {
             http.Error(w, fmt.Sprintf("Relay %d has already failed", relayId), http.StatusUnprocessableEntity)
         } else {
@@ -158,12 +158,12 @@ func handleCancelRelay(dbConn *sql.DB, w http.ResponseWriter, r *http.Request) {
 
     id, err := models.InsertCancellation(dbConn, relayId)
     if err != nil {
-		log.Println("handleCancelRelay: %w for relay=%d", err, relayId)
+		log.Printf("handleCancelRelay: %+v for relay=%d\n", err, relayId)
 		http.Error(w, fmt.Sprintf("Relay %d does not exist", relayId), http.StatusUnprocessableEntity)
     }
 
     if id == 0 {
-		log.Println("handleCancelRelay: cancellation request already exists for relay=%d", relayId)
+		log.Printf("handleCancelRelay: cancellation request already exists for relay=%d\n", relayId)
 		http.Error(w, fmt.Sprintf("Cancellation already exists for relay %d", relayId), http.StatusUnprocessableEntity)
     }
 
@@ -227,8 +227,6 @@ func handleCreateRelay(dbConn *sql.DB, w http.ResponseWriter, r *http.Request) {
 	// TODO: Send json?
 	io.WriteString(w, fmt.Sprintf("%d", relayId))
 }
-
-
 
 func CreateRelay(dbConn *sql.DB, deviceId string, cloudFunction string, argument string, desiredReturnCode sql.NullInt64, scheduledTime time.Time) (int, error) {
 	deviceKey, err := models.InsertOrUpdateDevice(dbConn, deviceId)

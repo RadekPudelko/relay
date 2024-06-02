@@ -8,27 +8,20 @@ import (
 	"os"
 
 	"relay/internal/middleware"
-	"relay/internal/particle"
 )
 
-func NewServer(dbConn *sql.DB) http.Handler {
+func NewServer(db *sql.DB) http.Handler {
 	mux := http.NewServeMux()
-	addRoutes(mux, dbConn)
+	addRoutes(mux, db)
 	var handler http.Handler = mux
 	handler = middleware.Logging(mux)
 	return handler
 }
 
-func Run(
-	config Config,
-	dbConn *sql.DB,
-	particle particle.ParticleAPI,
-) error {
-	go BackgroundTask(config, dbConn, particle)
-
-	srv := NewServer(dbConn)
+func Run(db *sql.DB, host string, port string) error {
+	srv := NewServer(db)
 	httpServer := &http.Server{
-		Addr:    net.JoinHostPort(config.Host, config.Port),
+		Addr:    net.JoinHostPort(host, port),
 		Handler: srv,
 	}
 
