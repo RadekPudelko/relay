@@ -2,7 +2,7 @@ all:
 	go run cmd/api/main.go
 
 client:
-	go run cmd/client/main.go
+	go run examples/client/main.go
 
 int:
 	go test test/integration_test.go test/test_utils.go -v | tee int.txt
