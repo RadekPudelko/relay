@@ -11,7 +11,8 @@ import (
 	"relay/internal/particle"
 )
 
-// TODO make backgroundTask sleep when there are no relays, wake by new relay post?
+// TODO: make backgroundTask sleep when there are no relays, wake by new relay post?
+// TODO: reduce logs
 func BackgroundTask(config Config, dbConn *sql.DB, particle particle.ParticleAPI) {
 	var sem = make(chan int, config.MaxRoutines)
 	lastRelayId := 0
@@ -96,7 +97,7 @@ func processRelay(config Config, dbConn *sql.DB, particle particle.ParticleAPI, 
 	if !relay.Device.LastOnline.Valid || time.Since(relay.Device.LastOnline.Time) > config.PingRetryDuration {
 		// Only ping a device if we have not pinged in n seconds
 		if relay.Device.LastPing.Valid && time.Since(relay.Device.LastPing.Time) < config.PingRetryDuration {
-			log.Printf("processRelay: id=%d, om %s is not online, skipping\n", id, relay.Device.DeviceId)
+			// log.Printf("processRelay: id=%d, device %s is not online, skipping\n", id, relay.Device.DeviceId)
 			return
 		}
 		log.Printf("processRelay: id=%d, pinging device %s\n", id, relay.Device.DeviceId)
@@ -112,7 +113,9 @@ func processRelay(config Config, dbConn *sql.DB, particle particle.ParticleAPI, 
 		}
 		if !online {
 			log.Printf("processRelay: id=%d, device %s is offline\n", id, relay.Device.DeviceId)
-			err = models.UpdateDevice(dbConn, relay.Device.Id, relay.Device.LastOnline, now)
+			// err = models.UpdateDevice(dbConn, relay.Device.Id, relay.Device.LastOnline, now)
+            later := time.Now().Add(config.PingRetryDuration).UTC()
+			err = models.UpdateRelay(dbConn, id, later, relay.Status, relay.Tries)
 			// TODO: This and many places like this should never fail, so should the server crash here??
 			if err != nil {
 				log.Printf("processRelay: id=%d, %+v\n", id, err)

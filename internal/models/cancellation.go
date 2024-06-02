@@ -11,6 +11,7 @@ type Cancellation struct {
 }
 
 //TODO: Fix database operations to use Query/Prepare/Exec at appropriate spots
+// TODO: add done flag instead of deleting entry?
 
 func SelectCancellations(db *sql.DB, limit int) ([]Cancellation, error) {
 	const query string = `SELECT * FROM cancellations LIMIT ?`

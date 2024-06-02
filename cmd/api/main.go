@@ -1,7 +1,6 @@
 package main
 
 import (
-	"database/sql"
 	"fmt"
 	"log"
 	"os"
@@ -22,13 +21,22 @@ func main() {
 }
 
 func run() error {
+	// config := server.Config{
+	// 	Host:              "localhost",
+	// 	Port:              "8080",
+	// 	MaxRoutines:       3,
+	// 	RelayLimit:        10,
+	// 	PingRetryDuration: 600 * time.Second,
+	// 	CFRetryDuration:   600 * time.Second,
+	// 	MaxRetries:        3,
+	// }
 	config := server.Config{
 		Host:              "localhost",
 		Port:              "8080",
 		MaxRoutines:       3,
 		RelayLimit:        10,
-		PingRetryDuration: 600 * time.Second,
-		CFRetryDuration:   600 * time.Second,
+		PingRetryDuration: 15 * time.Second,
+		CFRetryDuration:   10 * time.Second,
 		MaxRetries:        3,
 	}
 

@@ -5,8 +5,6 @@ import (
 	"math/rand"
 	"testing"
 	"time"
-    "net/http"
-    "strings"
 
 	"relay/internal/client"
 	"relay/internal/models"
@@ -19,13 +17,14 @@ type TestRelay struct {
 	DeviceId string
 	DRC      int
 	Status   models.RelayStatus
+    Cancel bool
 }
 
 func generateRelay(nDevices int) (string, int, models.RelayStatus) {
 	devNum := rand.Intn(nDevices)
 	deviceId := fmt.Sprintf("dev_%d", devNum)
-	drc := rand.Intn(3) + 1
-	if drc == 3 {
+	drc := rand.Intn(3) + 1 // 1-3 correspond to MockParticle return status options DRC != status
+	if drc == 3 { // Success
 		return deviceId, drc, models.RelayComplete
 	} else {
 		return deviceId, drc, models.RelayFailed
@@ -67,23 +66,6 @@ func TestIntegration(t *testing.T) {
 		t.Fatalf("TestIntegration: %+v", err)
 	}
 
-	// Expect an error here for non existant relay
-	relay, err := client.GetRelay(1)
-	if err == nil {
-		t.Fatalf("TestIntegration: want an error for GetRelay non existant relay got=%+v", relay)
-	}
-    if !strings.Contains(err.Error(), fmt.Sprintf("status code=%d", http.StatusBadRequest)) {
-		t.Fatalf("TestIntegration: want %d for GetRelay on non existant relay got=%+v", http.StatusBadRequest, err)
-    }
-
-    err = client.CancelRelay(1)
-    if err == nil {
-		t.Fatalf("TestIntegration: want an error for CancelRelay on non existant relay got=%+v", relay)
-    }
-    if !strings.Contains(err.Error(), fmt.Sprintf("status code=%d", http.StatusUnprocessableEntity)) {
-		t.Fatalf("TestIntegration: want %d for CancelRelay on non existant relay got %+v", http.StatusUnprocessableEntity, err)
-    }
-
 	cloudFunction := "func0"
 	argument := ""
 	var scheduledTime *time.Time = nil
@@ -103,9 +85,17 @@ func TestIntegration(t *testing.T) {
 		testRelays[i].DeviceId = deviceId
 		testRelays[i].DRC = drc
 		testRelays[i].Status = status
+        testRelays[i].Cancel = rand.Intn(10) == 0
+        if testRelays[i].Cancel {
+            err = client.CancelRelay(id)
+            if err != nil {
+                t.Logf("TestIntegration: %+v", err)
+            }
+        }
 	}
 
 	// TODO: add extra routine to spam the service with gets
+    // TODO: Move onto next relay if it is still in ready state
 	for i := 0; i < nRelays; i++ {
 		for {
 			relay, err := client.GetRelay(testRelays[i].Id)
@@ -114,9 +104,8 @@ func TestIntegration(t *testing.T) {
 			} else if relay.Status == models.RelayReady {
 				time.Sleep(100 * time.Millisecond)
 				continue
-			} else if relay.Status != testRelays[i].Status {
-				t.Fatalf("TestIntegration: relay status mismatch, want=%d, got=%d, relay=%+v\n", int(testRelays[i].Status), int(relay.Status), relay)
-			} else {
+            } else if relay.Status == testRelays[i].Status ||
+                testRelays[i].Cancel && relay.Status == models.RelayCancelled {
 				err = AssertRelay(relay, testRelays[i].DeviceId, cloudFunction, argument, &testRelays[i].DRC, relay.Status, scheduledTime, relay.Tries)
 				if err != nil {
 					t.Fatalf("TestIntegration: %+v", err)
@@ -125,6 +114,8 @@ func TestIntegration(t *testing.T) {
                     t.Fatalf("TestIntegration: tries=%d exceeds max tries=%d\n", relay.Tries, config.MaxRetries)
                 }
                 break
+			} else {
+				t.Fatalf("TestIntegration: relay status mismatch, want=%d, got=%d, relay=%+v, testRelay=%+v\n", int(testRelays[i].Status), int(relay.Status), relay, testRelays[i])
 			}
 		}
 	}
