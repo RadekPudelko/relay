@@ -33,10 +33,10 @@ func run() error {
 	config := server.Config{
 		Host:              "localhost",
 		Port:              "8080",
-		MaxRoutines:       3,
-		RelayLimit:        10,
-		PingRetryDuration: 15 * time.Second,
-		CFRetryDuration:   10 * time.Second,
+		MaxRoutines:       4,
+		RelayLimit:        100,
+		PingRetryDuration: 60 * time.Second,
+		CFRetryDuration:   60 * time.Second,
 		MaxRetries:        3,
 	}
 
