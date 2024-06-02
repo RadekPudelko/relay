@@ -7,6 +7,7 @@ import (
 	_ "github.com/mattn/go-sqlite3"
 )
 
+// TODO: Add database operation retry logic
 func Setup(path string, walMode bool) (*sql.DB, error) {
 	path += "?cache=shared"
 
@@ -38,6 +39,11 @@ func Setup(path string, walMode bool) (*sql.DB, error) {
 	if err != nil {
 		return nil, fmt.Errorf("Setup: failed to enabled foreign key constraints, %w", err)
 	}
+
+    _, err = db.Exec("PRAGMA busy_timeout = 5000;")
+    if err != nil {
+        return nil, fmt.Errorf("Setup: failed to set the busy_timeout, %w", err)
+    }
 
 	err = CreateTables(db)
 	if err != nil {
