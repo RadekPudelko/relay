@@ -94,12 +94,10 @@ func processRelay(config Config, dbConn *sql.DB, particle particle.ParticleAPI, 
 	// Consider pinging a device if its been more than n seconds since last check
 	// TODO: define a config for how long a last ping is valid for
 	// TODO: update online time on good communication from cf
-	// if !relay.Device.LastOnline.Valid || time.Since(relay.Device.LastOnline.Time) > config.PingRetryDuration {
-	if !relay.Device.LastOnline.Valid {
+    if relay.Device.LastOnline == nil {
 		// Only ping a device if we have not pinged in n seconds
 		log.Printf("processRelay: id=%d, pinging device %s\n", id, relay.Device.DeviceId)
 		online, err := particle.Ping(relay.Device.DeviceId)
-		now := sql.NullTime{Time: time.Now(), Valid: true}
 		if err != nil || !online {
             if err != nil {
                 log.Printf("processRelay: %+v for relay id=%d, device %s \n", err, id, relay.Device.DeviceId)
@@ -114,7 +112,8 @@ func processRelay(config Config, dbConn *sql.DB, particle particle.ParticleAPI, 
 			}
 			return
 		}
-		err = models.UpdateDevice(dbConn, relay.Device.Id, now)
+		now := time.Now().UTC()
+		err = models.UpdateDevice(dbConn, relay.Device.Id, &now)
 		if err != nil {
 			log.Printf("processRelay: relay id=%d, %+v\n", id, err)
 			return

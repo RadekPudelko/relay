@@ -8,8 +8,8 @@ import (
 )
 
 func TestCreateRelay(t *testing.T) {
-	db, err := SetupMemoryDB()
-	// db, err := SetupFileDB("test.db3")
+	// db, err := SetupMemoryDB()
+	db, err := SetupFileDB("test.db3")
 	if err != nil {
 		t.Fatalf("TestCancellations: %+v", err)
 	}

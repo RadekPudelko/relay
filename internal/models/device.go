@@ -3,12 +3,13 @@ package models
 import (
 	"database/sql"
 	"fmt"
+    "time"
 )
 
 type Device struct {
 	Id         int          `json:"id"`
 	DeviceId   string       `json:"device_id"`
-	LastOnline sql.NullTime `json:"last_online"`
+	LastOnline *time.Time `json:"last_online"`
 }
 
 func SelectDevice(db *sql.DB, key int) (*Device, error) {
@@ -51,7 +52,7 @@ func SelectDeviceByDeviceId(db *sql.DB, deviceId string) (*Device, error) {
 	return &device, nil
 }
 
-func UpdateDevice(db *sql.DB, id int, onlineTime sql.NullTime) error {
+func UpdateDevice(db *sql.DB, id int, onlineTime *time.Time) error {
 	const query string = `
         UPDATE devices
         SET last_online = ?
