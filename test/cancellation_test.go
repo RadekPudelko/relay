@@ -2,68 +2,62 @@ package test
 
 import (
 	"database/sql"
-	"testing"
-	"time"
 	"relay/internal/models"
 	"relay/internal/server"
+	"testing"
+	"time"
 )
 
 func TestCancellations(t *testing.T) {
-    db, err := SetupFileDB("test.db3")
+	db, err := SetupMemoryDB()
+	// db, err := SetupFileDB("test.db3")
 	if err != nil {
 		t.Fatalf("TestCancellations: %+v", err)
 	}
-    defer db.Close()
+	defer db.Close()
 
-    id, err := models.InsertCancellation(db, 1)
-    if err == nil {
-        t.Fatalf("TestCancellations: expected InsertCancellation on nonexistant relay to fail, created id=%d\n", id)
-    }
+	id, err := models.InsertCancellation(db, 1)
+	if err == nil {
+		t.Fatalf("TestCancellations: expected InsertCancellation on nonexistant relay to fail, created id=%d\n", id)
+	}
 
-    relayId, err:= AssertCreateRelay(db, "dev0", "", "", sql.NullInt64{Int64: 0, Valid: false}, time.Now().UTC())
-    if err != nil {
-        t.Fatalf("TestCancellations: %+v", err)
-    }
-    id, err = models.InsertCancellation(db, relayId)
-    if err != nil {
-        t.Fatalf("TestCancellations: %+v", err)
-    }
+	relayId, err := AssertCreateRelay(db, "dev0", "", "", sql.NullInt64{Int64: 0, Valid: false}, time.Now().UTC())
+	if err != nil {
+		t.Fatalf("TestCancellations: %+v", err)
+	}
+	id, err = models.InsertCancellation(db, relayId)
+	if err != nil {
+		t.Fatalf("TestCancellations: %+v", err)
+	}
 
-    err = server.ProcessCancellations(db)
-    if err != nil {
-        t.Fatalf("TestCancellations: %+v", err)
-    }
+	err = server.ProcessCancellations(db)
+	if err != nil {
+		t.Fatalf("TestCancellations: %+v", err)
+	}
 
-    relay, err := models.SelectRelay(db, relayId)
-    if err != nil {
-        t.Fatalf("TestCancellations: %+v", err)
-    }
+	relay, err := models.SelectRelay(db, relayId)
+	if err != nil {
+		t.Fatalf("TestCancellations: %+v", err)
+	}
+	if relay.Status != models.RelayCancelled {
+		t.Fatalf("TestCancellations: relay %d status, want=%d, got=%d", relayId, models.RelayCancelled, relay.Status)
+	}
 
-    if relay.Status != models.RelayCancelled {
-        t.Fatalf("TestCancellations: relay %d status, want=%d, got=%d", relayId, models.RelayCancelled, relay.Status)
-    }
+	cancellations, err := models.SelectCancellations(db, 100)
+	if err != nil {
+		t.Fatalf("TestCancellations: %+v", err)
+	}
+	if len(cancellations) != 0 {
+		t.Fatalf("TestCancellations: there should be no cancellations left, found %+v", cancellations)
+	}
 
-    cancellations, err := models.SelectCancellations(db, 100)
-    if err != nil {
-        t.Fatalf("TestCancellations: %+v", err)
-    }
-    if len(cancellations) != 0 {
-        t.Fatalf("TestCancellations: there should be no cancellations left, found %+v", cancellations)
-    }
-
-
-
-
-
-
-
-    // TODO: Close the server at the end of the test?
-    // go func() {
-    //     if err := server.Run(db, "localhost", "8080"); err != nil {
-    //         t.Fatalf("TestCancellations: Could not start server: %s\n", err)
-    //     }
-    // }()
-    // time.Sleep(100 * time.Millisecond)
+	// TODO: Close the server at the end of the test?
+	// go func() {
+	//     if err := server.Run(db, "localhost", "8080"); err != nil {
+	//         t.Fatalf("TestCancellations: Could not start server: %s\n", err)
+	//     }
+	// }()
+	// time.Sleep(100 * time.Millisecond)
 
 	// client := client.NewClient(8080)
 	// err = client.Ping()
@@ -71,22 +65,22 @@ func TestCancellations(t *testing.T) {
 	//        t.Fatalf("TestCancellations: failed to ping the server")
 	// }
 
-    // req, err := http.NewRequest("DELETE", "localhost:8080/api/relays/1", nil)
-    // if err != nil {
-    //     t.Fatalf("TestCancellations: %+v", err)
-    // }
-    //
-    // if req.Response.StatusCode != http.StatusUnprocessableEntity {
-    //     t.Errorf("TestCancellations: handler returned wrong status code for nonexistant relay: got %v want %v", req.Response.StatusCode, http.StatusUnprocessableEntity)
-    // }
-    // t.Logf("%+v\n", err)
-    // t.Logf("%+v\n", req)
+	// req, err := http.NewRequest("DELETE", "localhost:8080/api/relays/1", nil)
+	// if err != nil {
+	//     t.Fatalf("TestCancellations: %+v", err)
+	// }
+	//
+	// if req.Response.StatusCode != http.StatusUnprocessableEntity {
+	//     t.Errorf("TestCancellations: handler returned wrong status code for nonexistant relay: got %v want %v", req.Response.StatusCode, http.StatusUnprocessableEntity)
+	// }
+	// t.Logf("%+v\n", err)
+	// t.Logf("%+v\n", req)
 	// server := httptest.NewServer(server.HandleCancelRelay(db))
 	// server := httptest.NewServer(server.HandleCancelRelay(db))
 
-    // cancelHandler.ServeHTTP(rr, req)
-    // if status := rr.Code; status != http.StatusUnprocessableEntity {
-    // }
+	// cancelHandler.ServeHTTP(rr, req)
+	// if status := rr.Code; status != http.StatusUnprocessableEntity {
+	// }
 	// defer server.Close()
 
 	// req, err := http.NewRequest("Delete", server.URL +

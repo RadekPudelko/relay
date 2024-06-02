@@ -20,19 +20,16 @@ func SelectDevice(db *sql.DB, key int) (*Device, error) {
 	}
 	defer stmt.Close()
 
-	row, err := stmt.Query(key)
-	// Might have no rows, where does that error pop?
+	row := stmt.QueryRow(key)
+	var device Device
+	err = row.Scan(&device.Id, &device.DeviceId, &device.LastOnline, &device.LastPing)
 	if err != nil {
-		return nil, fmt.Errorf("SelectDevice: stmt.Query: %w", err)
+		if err == sql.ErrNoRows {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("SelectRelay: row.Scan: %w", err)
 	}
-	defer row.Close()
-
-	var dev Device
-	err = stmt.QueryRow(key).Scan(&dev.Id, &dev.DeviceId, &dev.LastOnline, &dev.LastPing)
-	if err != nil {
-		return nil, fmt.Errorf("SelectDevice: stmt.QueryRow: %w", err)
-	}
-	return &dev, nil
+	return &device, nil
 }
 
 func SelectDeviceByDeviceId(db *sql.DB, deviceId string) (*Device, error) {
@@ -43,8 +40,8 @@ func SelectDeviceByDeviceId(db *sql.DB, deviceId string) (*Device, error) {
 	}
 	defer stmt.Close()
 
-	var dev Device
-	err = stmt.QueryRow(deviceId).Scan(&dev.Id, &dev.DeviceId, &dev.LastOnline, &dev.LastPing)
+	var device Device
+	err = stmt.QueryRow(deviceId).Scan(&device.Id, &device.DeviceId, &device.LastOnline, &device.LastPing)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return nil, nil
@@ -52,7 +49,7 @@ func SelectDeviceByDeviceId(db *sql.DB, deviceId string) (*Device, error) {
 			return nil, fmt.Errorf("SelectDeviceByDeviceId: stmt.QueryRow: %w", err)
 		}
 	}
-	return &dev, nil
+	return &device, nil
 }
 
 func UpdateDevice(db *sql.DB, id int, onlineTime, pingTime sql.NullTime) error {
@@ -101,15 +98,15 @@ func InsertDevice(db *sql.DB, deviceId string) (int, error) {
 }
 
 // Inserts a device into the devices table if it doesn't exist
-// Returns priamary key for the dev
+// Returns priamary key for the device
 // TODO: This can be 1 sql statement
 func InsertOrUpdateDevice(db *sql.DB, deviceId string) (int, error) {
-	dev, err := SelectDeviceByDeviceId(db, deviceId)
+	device, err := SelectDeviceByDeviceId(db, deviceId)
 	if err != nil {
 		return -1, fmt.Errorf("InsertOrUpdateDevice: %w", err)
 	}
-	if dev != nil {
-		return dev.Id, nil
+	if device != nil {
+		return device.Id, nil
 	}
 	return InsertDevice(db, deviceId)
 }

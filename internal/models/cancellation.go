@@ -6,14 +6,14 @@ import (
 )
 
 type Cancellation struct {
-    Id         int          `json:"id"`
-    RelayId   int       `json:"relay_id"`
+	Id      int `json:"id"`
+	RelayId int `json:"relay_id"`
 }
 
 //TODO: Fix database operations to use Query/Prepare/Exec at appropriate spots
 
 func SelectCancellations(db *sql.DB, limit int) ([]Cancellation, error) {
-    const query string = `SELECT * FROM cancellations LIMIT ?`
+	const query string = `SELECT * FROM cancellations LIMIT ?`
 	stmt, err := db.Prepare(query)
 	if err != nil {
 		return nil, fmt.Errorf("SelectCancellation: db.Prepare: %w", err)
@@ -29,7 +29,7 @@ func SelectCancellations(db *sql.DB, limit int) ([]Cancellation, error) {
 
 	var cancellations []Cancellation
 	for rows.Next() {
-        var cancellation Cancellation
+		var cancellation Cancellation
 		if err := rows.Scan(&cancellation.Id, &cancellation.RelayId); err != nil {
 			return nil, fmt.Errorf("SelectCancellations: rows.Scan: %w", err)
 		}
@@ -55,38 +55,37 @@ func InsertCancellation(db *sql.DB, relayId int) (int, error) {
 		return 0, fmt.Errorf("InsertCancellation: stmt.Exec: %w", err)
 	}
 
-    rowsAffected, err := result.RowsAffected()
+	rowsAffected, err := result.RowsAffected()
 	if err != nil {
 		return 0, fmt.Errorf("InsertCancellation: result.RowsAffected: %w", err)
 	}
 
-    if rowsAffected == 0 {
-        return 0, nil
-    }
+	if rowsAffected == 0 {
+		return 0, nil
+	}
 
 	id, err := result.LastInsertId()
 	if err != nil {
 		return 0, fmt.Errorf("InsertCancellation: result.LastInsertId: %w", err)
 	}
 
-    return int(id), nil
+	return int(id), nil
 }
 
-func DeleteCancellation(db *sql.DB, id int) (error) {
-    query := `DELETE FROM cancellations WHERE id = ?`
-    result, err := db.Exec(query, id)
-    if err != nil {
-        return fmt.Errorf("DeleteCancellation: db.Exec: %w", err)
-    }
+func DeleteCancellation(db *sql.DB, id int) error {
+	query := `DELETE FROM cancellations WHERE id = ?`
+	result, err := db.Exec(query, id)
+	if err != nil {
+		return fmt.Errorf("DeleteCancellation: db.Exec: %w", err)
+	}
 
-    rowsAffected, err := result.RowsAffected()
-    if err != nil {
-        return fmt.Errorf("DeleteCancellation: result.RowsAffected: %w", err)
-    }
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("DeleteCancellation: result.RowsAffected: %w", err)
+	}
 
-    if rowsAffected != 1 {
-        return fmt.Errorf("DeleteCancellation: rowsAffect want=1, got=%d", rowsAffected)
-    }
-    return nil
+	if rowsAffected != 1 {
+		return fmt.Errorf("DeleteCancellation: rowsAffect want=1, got=%d", rowsAffected)
+	}
+	return nil
 }
-

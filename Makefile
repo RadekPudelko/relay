@@ -7,10 +7,12 @@ client:
 int:
 	go test test/integration_test.go test/test_utils.go -v | tee int.txt
 
-unit:
-	go test test/unit_test.go -v
+unit: relay cancellation
 
-cancel:
+relay:
+	go test test/relay_test.go test/test_utils.go -v
+
+cancellation:
 	go test test/cancellation_test.go test/test_utils.go -v
 
 fmt:

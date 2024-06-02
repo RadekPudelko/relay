@@ -39,10 +39,10 @@ func (t Relay) String() string {
 type RelayStatus int
 
 const (
-	RelayReady    RelayStatus = 0
-	RelayFailed   RelayStatus = 1
-	RelayComplete RelayStatus = 2
-	RelayCancelled   RelayStatus = 3
+	RelayReady     RelayStatus = 0
+	RelayFailed    RelayStatus = 1
+	RelayComplete  RelayStatus = 2
+	RelayCancelled RelayStatus = 3
 )
 
 // Example of custom field serialization so that instead of reporting sql.NullFields
@@ -221,7 +221,7 @@ func UpdateRelay(db *sql.DB, relayId int, scheduledTime time.Time, status RelayS
 	return nil
 }
 
-func UpdateRelayStatus(db *sql.DB, relayId int, status RelayStatus) (error) {
+func UpdateRelayStatus(db *sql.DB, relayId int, status RelayStatus) error {
 	const query string = `
         UPDATE relays
         SET status = ?

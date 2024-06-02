@@ -60,4 +60,3 @@ func run() error {
 	err = server.Run(config, dbConn)
 	return nil
 }
-

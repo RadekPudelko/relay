@@ -116,7 +116,7 @@ func HandleCancelRelay(dbConn *sql.DB) http.Handler {
 
 func handleCancelRelay(dbConn *sql.DB, w http.ResponseWriter, r *http.Request) {
 	relayIdStr := r.PathValue("id")
-    log.Println("sadf: ", relayIdStr)
+	log.Println("sadf: ", relayIdStr)
 
 	if relayIdStr == "" {
 		log.Println("handleCancelRelay: missing relay id in url: ", r.URL.Path)
@@ -140,32 +140,32 @@ func handleCancelRelay(dbConn *sql.DB, w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-    if relay == nil {
+	if relay == nil {
 		log.Printf("handleCancelRelay: relay id=%d does not exist\n", relayId)
 		http.Error(w, fmt.Sprintf("Relay %d does not exist", relayId), http.StatusUnprocessableEntity)
 		return
-    }
+	}
 
-    if relay.Status != models.RelayReady {
-        log.Printf("handleCancelRelay: relay id=%d is not cancellatble, status=%d\n", relayId, relay.Status)
-        if relay.Status == models.RelayFailed {
-            http.Error(w, fmt.Sprintf("Relay %d has already failed", relayId), http.StatusUnprocessableEntity)
-        } else {
-            http.Error(w, fmt.Sprintf("Relay %d has already succeeded", relayId), http.StatusUnprocessableEntity)
-        }
+	if relay.Status != models.RelayReady {
+		log.Printf("handleCancelRelay: relay id=%d is not cancellatble, status=%d\n", relayId, relay.Status)
+		if relay.Status == models.RelayFailed {
+			http.Error(w, fmt.Sprintf("Relay %d has already failed", relayId), http.StatusUnprocessableEntity)
+		} else {
+			http.Error(w, fmt.Sprintf("Relay %d has already succeeded", relayId), http.StatusUnprocessableEntity)
+		}
 		return
-    }
+	}
 
-    id, err := models.InsertCancellation(dbConn, relayId)
-    if err != nil {
+	id, err := models.InsertCancellation(dbConn, relayId)
+	if err != nil {
 		log.Printf("handleCancelRelay: %+v for relay=%d\n", err, relayId)
 		http.Error(w, fmt.Sprintf("Relay %d does not exist", relayId), http.StatusUnprocessableEntity)
-    }
+	}
 
-    if id == 0 {
+	if id == 0 {
 		log.Printf("handleCancelRelay: cancellation request already exists for relay=%d\n", relayId)
 		http.Error(w, fmt.Sprintf("Cancellation already exists for relay %d", relayId), http.StatusUnprocessableEntity)
-    }
+	}
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusAccepted)
