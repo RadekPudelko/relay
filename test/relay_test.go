@@ -38,7 +38,7 @@ func TestCreateRelay(t *testing.T) {
 		t.Fatalf("TestCreateRelays: expected to create relay id 2, got %d", tid)
 	}
 
-    code := 0
+	code := 0
 	desiredReturnCode = &code
 	tid, err = AssertCreateRelay(db, relayId, cloudFunction, argument, desiredReturnCode, scheduledTime0)
 	if err != nil {

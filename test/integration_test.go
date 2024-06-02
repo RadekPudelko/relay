@@ -8,8 +8,8 @@ import (
 
 	"relay/internal/client"
 	"relay/internal/models"
-	"relay/internal/server"
 	"relay/internal/particle"
+	"relay/internal/server"
 )
 
 type TestRelay struct {
@@ -17,14 +17,14 @@ type TestRelay struct {
 	DeviceId string
 	DRC      int
 	Status   models.RelayStatus
-    Cancel bool
+	Cancel   bool
 }
 
 func generateRelay(nDevices int) (string, int, models.RelayStatus) {
 	devNum := rand.Intn(nDevices)
 	deviceId := fmt.Sprintf("dev_%d", devNum)
 	drc := rand.Intn(3) + 1 // 1-3 correspond to MockParticle return status options DRC != status
-	if drc == 3 { // Success
+	if drc == 3 {           // Success
 		return deviceId, drc, models.RelayComplete
 	} else {
 		return deviceId, drc, models.RelayFailed
@@ -50,13 +50,13 @@ func TestIntegration(t *testing.T) {
 	}
 	// defer db.Close()
 
-    particle := particle.NewMock()
+	particle := particle.NewMock()
 	go server.BackgroundTask(config, db, particle)
 	go func() {
-	    if err := server.Run(db, "localhost", "8080"); err != nil {
+		if err := server.Run(db, "localhost", "8080"); err != nil {
 			// TODO: Fix this warning
-	        t.Fatalf("TestCancellations: Could not start server: %s\n", err)
-	    }
+			t.Fatalf("TestCancellations: Could not start server: %s\n", err)
+		}
 	}()
 
 	time.Sleep(100 * time.Millisecond)
@@ -85,17 +85,17 @@ func TestIntegration(t *testing.T) {
 		testRelays[i].DeviceId = deviceId
 		testRelays[i].DRC = drc
 		testRelays[i].Status = status
-        testRelays[i].Cancel = rand.Intn(10) == 0
-        if testRelays[i].Cancel {
-            err = client.CancelRelay(id)
-            if err != nil {
-                t.Logf("TestIntegration: %+v", err)
-            }
-        }
+		testRelays[i].Cancel = rand.Intn(10) == 0
+		if testRelays[i].Cancel {
+			err = client.CancelRelay(id)
+			if err != nil {
+				t.Logf("TestIntegration: %+v", err)
+			}
+		}
 	}
 
 	// TODO: add extra routine to spam the service with gets
-    // TODO: Move onto next relay if it is still in ready state
+	// TODO: Move onto next relay if it is still in ready state
 	for i := 0; i < nRelays; i++ {
 		for {
 			relay, err := client.GetRelay(testRelays[i].Id)
@@ -104,16 +104,16 @@ func TestIntegration(t *testing.T) {
 			} else if relay.Status == models.RelayReady {
 				time.Sleep(100 * time.Millisecond)
 				continue
-            } else if relay.Status == testRelays[i].Status ||
-                testRelays[i].Cancel && relay.Status == models.RelayCancelled {
+			} else if relay.Status == testRelays[i].Status ||
+				testRelays[i].Cancel && relay.Status == models.RelayCancelled {
 				err = AssertRelay(relay, testRelays[i].DeviceId, cloudFunction, argument, &testRelays[i].DRC, relay.Status, scheduledTime, relay.Tries)
 				if err != nil {
 					t.Fatalf("TestIntegration: %+v", err)
 				}
-                if relay.Tries > config.MaxRetries {
-                    t.Fatalf("TestIntegration: tries=%d exceeds max tries=%d\n", relay.Tries, config.MaxRetries)
-                }
-                break
+				if relay.Tries > config.MaxRetries {
+					t.Fatalf("TestIntegration: tries=%d exceeds max tries=%d\n", relay.Tries, config.MaxRetries)
+				}
+				break
 			} else {
 				t.Fatalf("TestIntegration: relay status mismatch, want=%d, got=%d, relay=%+v, testRelay=%+v\n", int(testRelays[i].Status), int(relay.Status), relay, testRelays[i])
 			}

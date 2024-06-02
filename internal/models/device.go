@@ -3,12 +3,12 @@ package models
 import (
 	"database/sql"
 	"fmt"
-    "time"
+	"time"
 )
 
 type Device struct {
-	Id         int          `json:"id"`
-	DeviceId   string       `json:"device_id"`
+	Id         int        `json:"id"`
+	DeviceId   string     `json:"device_id"`
 	LastOnline *time.Time `json:"last_online"`
 }
 

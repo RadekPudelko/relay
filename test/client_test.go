@@ -2,15 +2,15 @@ package test
 
 import (
 	"fmt"
+	"net/http"
+	"strings"
 	"testing"
 	"time"
-    "net/http"
-    "strings"
 
 	"relay/internal/client"
 	"relay/internal/models"
-	"relay/internal/server"
 	"relay/internal/particle"
+	"relay/internal/server"
 )
 
 func TestClient(t *testing.T) {
@@ -32,12 +32,12 @@ func TestClient(t *testing.T) {
 	}
 	// defer db.Close()
 
-    particle := particle.NewMock()
+	particle := particle.NewMock()
 	go func() {
-	    if err := server.Run(db, "localhost", "8080"); err != nil {
+		if err := server.Run(db, "localhost", "8080"); err != nil {
 			// TODO: Fix this warning
-	        t.Fatalf("TestCancellations: Could not start server: %s\n", err)
-	    }
+			t.Fatalf("TestCancellations: Could not start server: %s\n", err)
+		}
 	}()
 
 	time.Sleep(100 * time.Millisecond)
@@ -52,52 +52,52 @@ func TestClient(t *testing.T) {
 	if err == nil {
 		t.Fatalf("TestClient: want an error for GetRelay non existant relay got=%+v", relay)
 	}
-    if !strings.Contains(err.Error(), fmt.Sprintf("status code=%d", http.StatusBadRequest)) {
+	if !strings.Contains(err.Error(), fmt.Sprintf("status code=%d", http.StatusBadRequest)) {
 		t.Fatalf("TestClient: want %d for GetRelay on non existant relay got=%+v", http.StatusBadRequest, err)
-    }
+	}
 
-    err = client.CancelRelay(1)
-    if err == nil {
+	err = client.CancelRelay(1)
+	if err == nil {
 		t.Fatalf("TestClient: want an error for CancelRelay on non existant relay got=%+v", relay)
-    }
-    if !strings.Contains(err.Error(), fmt.Sprintf("status code=%d", http.StatusUnprocessableEntity)) {
+	}
+	if !strings.Contains(err.Error(), fmt.Sprintf("status code=%d", http.StatusUnprocessableEntity)) {
 		t.Fatalf("TestClient: want %d for CancelRelay on non existant relay got %+v", http.StatusUnprocessableEntity, err)
-    }
+	}
 
-    deviceId := "device0"
+	deviceId := "device0"
 	cloudFunction := "func0"
 	argument := ""
-    var drc *int = nil
+	var drc *int = nil
 	var scheduledTime *time.Time = nil
 
-    id, err := client.CreateRelay(deviceId, cloudFunction, argument, drc, scheduledTime)
-    if err != nil {
-        t.Fatalf("TestClient: %+v", err)
-    }
+	id, err := client.CreateRelay(deviceId, cloudFunction, argument, drc, scheduledTime)
+	if err != nil {
+		t.Fatalf("TestClient: %+v", err)
+	}
 
 	relay, err = client.GetRelay(id)
 	if err != nil {
-        t.Fatalf("TestClient: %+v", err)
+		t.Fatalf("TestClient: %+v", err)
 	}
-    err = AssertRelay(relay, deviceId, cloudFunction, argument, drc, models.RelayReady, scheduledTime, 0)
+	err = AssertRelay(relay, deviceId, cloudFunction, argument, drc, models.RelayReady, scheduledTime, 0)
 	if err != nil {
-        t.Fatalf("TestClient: %+v", err)
+		t.Fatalf("TestClient: %+v", err)
 	}
 
-    err = client.CancelRelay(id)
-    if err != nil {
-        t.Fatalf("TestClient: %+v", err)
-    }
+	err = client.CancelRelay(id)
+	if err != nil {
+		t.Fatalf("TestClient: %+v", err)
+	}
 
 	go server.BackgroundTask(config, db, particle)
-    time.Sleep(100 * time.Millisecond)
+	time.Sleep(100 * time.Millisecond)
 
 	relay, err = client.GetRelay(id)
 	if err != nil {
-        t.Fatalf("TestClient: %+v", err)
+		t.Fatalf("TestClient: %+v", err)
 	}
-    err = AssertRelay(relay, deviceId, cloudFunction, argument, drc, models.RelayCancelled, scheduledTime, 0)
+	err = AssertRelay(relay, deviceId, cloudFunction, argument, drc, models.RelayCancelled, scheduledTime, 0)
 	if err != nil {
-        t.Fatalf("TestClient: %+v", err)
+		t.Fatalf("TestClient: %+v", err)
 	}
 }

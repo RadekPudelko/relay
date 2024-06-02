@@ -65,6 +65,6 @@ func run() error {
 	defer dbConn.Close()
 
 	go server.BackgroundTask(config, dbConn, particle)
-    err = server.Run(dbConn, config.Host, config.Port)
+	err = server.Run(dbConn, config.Host, config.Port)
 	return nil
 }

@@ -53,10 +53,10 @@ func AssertCreateRelay(db *sql.DB,
 	if err != nil {
 		return 0, fmt.Errorf("AssertCreateRelay: %w", err)
 	}
-    err = AssertRelay(relay, deviceId, cloudFunction, argument, desiredReturnCode, models.RelayReady, &scheduledTime, 0)
-    if err != nil {
-        return 0, fmt.Errorf("AssertCreateRelay: %w", err)
-    }
+	err = AssertRelay(relay, deviceId, cloudFunction, argument, desiredReturnCode, models.RelayReady, &scheduledTime, 0)
+	if err != nil {
+		return 0, fmt.Errorf("AssertCreateRelay: %w", err)
+	}
 	return id, nil
 }
 
@@ -66,9 +66,9 @@ func AssertRelay(
 	cloudFunction string,
 	argument string,
 	desiredReturnCode *int,
-    status models.RelayStatus,
+	status models.RelayStatus,
 	scheduledTime *time.Time,
-    tries int,
+	tries int,
 ) error {
 	if relay.Device.DeviceId != deviceId {
 		return fmt.Errorf("AssertRelay: deviceId, want=%s, got=%s", deviceId, relay.Device.DeviceId)
@@ -80,9 +80,9 @@ func AssertRelay(
 		return fmt.Errorf("AssertRelay: argument, want=%s, got=%s", argument, relay.Argument)
 	}
 	if desiredReturnCode != nil {
-        if relay.DesiredReturnCode == nil {
+		if relay.DesiredReturnCode == nil {
 			return fmt.Errorf("AssertRelay: desired return code: got nil")
-        } else if *relay.DesiredReturnCode != *desiredReturnCode {
+		} else if *relay.DesiredReturnCode != *desiredReturnCode {
 			return fmt.Errorf("AssertRelay: desired return code: want=%d, got=%d", *desiredReturnCode, *relay.DesiredReturnCode)
 		}
 	}
@@ -107,7 +107,7 @@ func AssertUpdateRelay(db *sql.DB, relayId int, deviceId string, cloudFunction s
 	if err != nil {
 		return fmt.Errorf("AssertUpdateRelay: %w", err)
 	}
-    err = AssertRelay(relay, deviceId, cloudFunction, argument, desiredReturnCode, status, &scheduledTime, tries)
+	err = AssertRelay(relay, deviceId, cloudFunction, argument, desiredReturnCode, status, &scheduledTime, tries)
 	return nil
 }
 

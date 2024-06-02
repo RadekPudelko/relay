@@ -37,9 +37,9 @@ func (p MockParticle) Ping(deviceId string) (bool, error) {
 
 // Return is decided by the value returnValue
 func (p MockParticle) CloudFunction(deviceId string, cloudFunction string, argument string, returnValue *int) (bool, error) {
-    if returnValue == nil {
+	if returnValue == nil {
 		return true, nil
-    }
+	}
 	// TODO: add latency
 	// TODO: make this random instead
 	switch *returnValue {

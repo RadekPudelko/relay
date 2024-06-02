@@ -8,14 +8,14 @@ import (
 
 // TODO: decide how to handle nullable vars in marshal/unmarshal
 type Relay struct {
-	Id                int           `json:"id"`
-	Device            *Device       `json:"device"`
-	CloudFunction     string        `json:"cloud_function"`
-	Argument          string        `json:"argument"`
-	DesiredReturnCode *int `json:"desired_return_code"`
-	ScheduledTime     time.Time     `json:"scheduled_time"`
-	Status            RelayStatus   `json:"status"`
-	Tries             int           `json:"tries"`
+	Id                int         `json:"id"`
+	Device            *Device     `json:"device"`
+	CloudFunction     string      `json:"cloud_function"`
+	Argument          string      `json:"argument"`
+	DesiredReturnCode *int        `json:"desired_return_code"`
+	ScheduledTime     time.Time   `json:"scheduled_time"`
+	Status            RelayStatus `json:"status"`
+	Tries             int         `json:"tries"`
 }
 
 func (t Relay) String() string {

@@ -94,20 +94,20 @@ func processRelay(config Config, dbConn *sql.DB, particle particle.ParticleAPI, 
 	// Consider pinging a device if its been more than n seconds since last check
 	// TODO: define a config for how long a last ping is valid for
 	// TODO: update online time on good communication from cf
-    if relay.Device.LastOnline == nil {
+	if relay.Device.LastOnline == nil {
 		// Only ping a device if we have not pinged in n seconds
 		log.Printf("processRelay: id=%d, pinging device %s\n", id, relay.Device.DeviceId)
 		online, err := particle.Ping(relay.Device.DeviceId)
 		if err != nil || !online {
-            if err != nil {
-                log.Printf("processRelay: %+v for relay id=%d, device %s \n", err, id, relay.Device.DeviceId)
-            } else {
-                log.Printf("processRelay: id=%d, device %s is offline\n", id, relay.Device.DeviceId)
-            }
-            later := time.Now().Add(config.PingRetryDuration).UTC()
+			if err != nil {
+				log.Printf("processRelay: %+v for relay id=%d, device %s \n", err, id, relay.Device.DeviceId)
+			} else {
+				log.Printf("processRelay: id=%d, device %s is offline\n", id, relay.Device.DeviceId)
+			}
+			later := time.Now().Add(config.PingRetryDuration).UTC()
 			err = models.UpdateRelay(dbConn, id, later, relay.Status, relay.Tries)
 			if err != nil {
-                // TODO: This and many places like this should never fail, so should the server crash here??
+				// TODO: This and many places like this should never fail, so should the server crash here??
 				log.Printf("processRelay: id=%d, %+v\n", id, err)
 			}
 			return
