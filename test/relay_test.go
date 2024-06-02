@@ -2,12 +2,10 @@ package test
 
 import (
 	"database/sql"
-	"fmt"
 	"testing"
 	"time"
 
 	"relay/internal/models"
-	"relay/internal/server"
 )
 
 func TestCreateRelay(t *testing.T) {
@@ -200,15 +198,4 @@ func TestGetReadyRelays(t *testing.T) {
 		t.Fatalf("TestGetReadyRelays: %+v", err)
 	}
 	t.Log(t0, t1, t2, t3, t4, t5, t6, t7, t8)
-}
-
-func AssertGetReadyRelays(db *sql.DB, scheduledTime time.Time, startId, limit int, expectedRelayIds []int) error {
-	relays, err := server.GetReadyRelays(db, startId, limit, scheduledTime)
-	if err != nil {
-		return fmt.Errorf("AssertGetReadyRelays: %w", err)
-	}
-	if !SliceCompare(relays, expectedRelayIds) {
-		return fmt.Errorf("TestGetReadyRelays: mismatch relays, expected %+v, got %+v", expectedRelayIds, relays)
-	}
-	return nil
 }

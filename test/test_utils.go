@@ -53,26 +53,57 @@ func AssertCreateRelay(db *sql.DB,
 	if err != nil {
 		return 0, fmt.Errorf("AssertCreateRelay: %w", err)
 	}
-
-	if relay.Device.DeviceId != deviceId {
-		return 0, fmt.Errorf("AssertCreateRelay: SelectRelay on relay %d got relayId %s, expected %s", id, relay.Device.DeviceId, deviceId)
-	}
-	if relay.CloudFunction != cloudFunction {
-		return 0, fmt.Errorf("AssertCreateRelay: SelectRelay on relay %d got cloudFunction %s, expected %s", id, relay.CloudFunction, cloudFunction)
-	}
-	if relay.Argument != argument {
-		return 0, fmt.Errorf("AssertCreateRelay: SelectRelay on relay %d got argument %s, expected %s", id, relay.Argument, argument)
-	}
-	if relay.DesiredReturnCode != desiredReturnCode {
-		return 0, fmt.Errorf("AssertCreateRelay: SelectRelay on relay %d got desiredReturnCode %+v, expected %+v", id, relay.DesiredReturnCode, desiredReturnCode)
-	}
-	if relay.ScheduledTime != scheduledTime {
-		return 0, fmt.Errorf("AssertCreateRelay: SelectRelay on relay %d got scheduledTime %s, expected %s", id, relay.ScheduledTime, scheduledTime)
-	}
+    var drc *int = nil
+    if desiredReturnCode.Valid {
+        drcVal := int(desiredReturnCode.Int64)
+        drc = &drcVal
+    }
+    err = AssertRelay(relay, deviceId, cloudFunction, argument, drc, models.RelayReady, &scheduledTime, 0)
+    if err != nil {
+        return 0, fmt.Errorf("AssertCreateRelay: %w", err)
+    }
 	return id, nil
 }
 
-func AssertUpdateRelay(db *sql.DB, relayId int, scheduledTime time.Time, status models.RelayStatus, tries int) error {
+func AssertRelay(
+	relay *models.Relay,
+	deviceId string,
+	cloudFunction string,
+	argument string,
+	desiredReturnCode *int,
+    status models.RelayStatus,
+	scheduledTime *time.Time,
+    tries int,
+) error {
+	if relay.Device.DeviceId != deviceId {
+		return fmt.Errorf("AssertRelay: deviceId, want=%s, got=%s", deviceId, relay.Device.DeviceId)
+	}
+	if relay.CloudFunction != cloudFunction {
+		return fmt.Errorf("AssertRelay: cloudFunction, want=%s, got=%s", cloudFunction, relay.CloudFunction)
+	}
+	if relay.Argument != argument {
+		return fmt.Errorf("AssertRelay: argument, want=%s, got=%s", argument, relay.Argument)
+	}
+	if desiredReturnCode != nil {
+		if !relay.DesiredReturnCode.Valid {
+			return fmt.Errorf("AssertRelay: desired return code: got invalid")
+		} else if int(relay.DesiredReturnCode.Int64) != *desiredReturnCode {
+			return fmt.Errorf("AssertRelay: desired return code: want=%d, got=%d", *desiredReturnCode, relay.DesiredReturnCode.Int64)
+		}
+	}
+	if relay.Status != status {
+		return fmt.Errorf("AssertRelay: status want=%d, got=%d", status, relay.Status)
+	}
+	if scheduledTime != nil && relay.ScheduledTime != *scheduledTime {
+		return fmt.Errorf("AssertRelay: scheduled time: want=%s, got=%s", scheduledTime, relay.ScheduledTime)
+	}
+	if relay.Tries != tries {
+		return fmt.Errorf("AssertRelay: tries want=%d, got=%d", tries, relay.Tries)
+	}
+	return nil
+}
+
+func AssertUpdateRelay(db *sql.DB, relayId int, deviceId string, cloudFunction string, argument string, desiredReturnCode *int, scheduledTime time.Time, status models.RelayStatus, tries int) error {
 	err := models.UpdateRelay(db, relayId, scheduledTime, status, tries)
 	if err != nil {
 		return fmt.Errorf("AssertUpdateRelay: %w", err)
@@ -81,15 +112,7 @@ func AssertUpdateRelay(db *sql.DB, relayId int, scheduledTime time.Time, status 
 	if err != nil {
 		return fmt.Errorf("AssertUpdateRelay: %w", err)
 	}
-	if relay.ScheduledTime != scheduledTime {
-		return fmt.Errorf("AssertUpdateRelay: scheduleTime want=%s, got=%s", scheduledTime, relay.ScheduledTime)
-	}
-	if relay.ScheduledTime != scheduledTime {
-		return fmt.Errorf("AssertUpdateRelay: status want=%d, got=%d", status, relay.Status)
-	}
-	if relay.Tries != tries {
-		return fmt.Errorf("AssertUpdateRelay: tries want=%d, got=%d", tries, relay.Tries)
-	}
+    err = AssertRelay(relay, deviceId, cloudFunction, argument, desiredReturnCode, status, &scheduledTime, tries)
 	return nil
 }
 
@@ -98,7 +121,12 @@ func AssertCreateAndUpdateRelay(db *sql.DB, deviceId string, cloudFunction, argu
 	if err != nil {
 		return 0, fmt.Errorf("AssertCreateAndUpdateRelay: %w", err)
 	}
-	err = AssertUpdateRelay(db, relayId, scheduledTime, status, tries)
+    var drc *int = nil
+    if desiredReturnCode.Valid {
+        drcVal := int(desiredReturnCode.Int64)
+        drc = &drcVal
+    }
+	err = AssertUpdateRelay(db, relayId, deviceId, cloudFunction, argument, drc, scheduledTime, status, tries)
 	if err != nil {
 		return 0, fmt.Errorf("AssertCreateAndUpdateRelay: %w", err)
 	}
@@ -111,7 +139,7 @@ func AssertGetReadyRelays(db *sql.DB, scheduledTime time.Time, startId, limit in
 		return fmt.Errorf("AssertGetReadyRelays: %w", err)
 	}
 	if !SliceCompare(relays, expectedRelayIds) {
-		return fmt.Errorf("TestGetReadyRelays: mismatch relays, expected %+v, got %+v", expectedRelayIds, relays)
+		return fmt.Errorf("TestGetReadyRelays: mismatch relays, want %+v, got %+v", expectedRelayIds, relays)
 	}
 	return nil
 }
@@ -128,59 +156,3 @@ func SliceCompare(a, b []int) bool {
 	}
 	return true
 }
-
-// func runTestServer(config server.Config) error {
-// 	particle := particle.NewMock()
-//
-// 	// TODO: Load from .env
-// 	// testDBPath := ":memory:"
-// 	// testDBPath := "test/test.db3"
-// 	testDBPath := "test.db3"
-// 	// _, err := os.Stat(testDBPath)
-// 	// fmt.Printf("%+v\n", err)
-// 	// if err != nil && !os.IsNotExist(err) {
-// 	//     return fmt.Errorf("run: %w", err)
-// 	// } else if err != nil {
-// 	err := os.Remove(testDBPath)
-// 	if err != nil {
-// 		return fmt.Errorf("run: %w", err)
-// 	}
-// 	// }
-// 	// return fmt.Errorf("asdf")
-// 	// testDBPath += "?cache=shared?_busy_timeout=5000"
-// 	testDBPath += "?cache=shared"
-//
-// 	db, err := database.Connect(testDBPath)
-// 	if err != nil {
-// 		return fmt.Errorf("run: %w", err)
-// 	}
-// 	defer db.Close()
-//
-// 	// https://phiresky.github.io/blog/2020/sqlite-performance-tuning/
-// 	_, err = db.Exec("PRAGMA journal_mode=WAL;")
-// 	if err != nil {
-// 		return fmt.Errorf("run: %w", err)
-// 	}
-//
-// 	// Confirm that WAL mode is enabled
-// 	var mode string
-// 	err = db.QueryRow("PRAGMA journal_mode;").Scan(&mode)
-// 	if err != nil {
-// 		return fmt.Errorf("run: %w", err)
-// 	}
-// 	if mode != "wal" {
-// 		return fmt.Errorf("run: expected wal mode")
-// 	}
-//
-// 	err = database.CreateTables(db)
-// 	if err != nil {
-// 		return fmt.Errorf("run: %w", err)
-// 	}
-//
-// 	err = server.Run(config, db, particle)
-// 	if err != nil {
-// 		return fmt.Errorf("run: %w", err)
-// 	}
-//
-// 	return nil
-// }

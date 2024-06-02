@@ -48,7 +48,7 @@ func (c Client) GetRelay(id int) (*models.Relay, error) {
 	}
 
 	if resp.StatusCode != 200 {
-		return nil, fmt.Errorf("GetRelay: response status: %d, body %s", resp.StatusCode, body)
+		return nil, fmt.Errorf("GetRelay: response status code=%d, body=%s", resp.StatusCode, body)
 	}
 
 	var relay models.Relay
@@ -95,7 +95,7 @@ func (c Client) CreateRelay(deviceId string, cloudFunction string, argument stri
 
 	// Check the response status code
 	if resp.StatusCode != http.StatusOK {
-		return 0, fmt.Errorf("CreateRelay: request error, status code=%d, body=%s", resp.StatusCode, body)
+		return 0, fmt.Errorf("CreateRelay: response status code=%d, body=%s", resp.StatusCode, body)
 	}
 
 	id, err := strconv.ParseInt(string(body), 10, 64)
@@ -106,7 +106,7 @@ func (c Client) CreateRelay(deviceId string, cloudFunction string, argument stri
 }
 
 func (c Client) CancelRelay(id int) error {
-	req, err := http.NewRequest("Delete", fmt.Sprintf("%s/api/relays/%d", c.url, id), nil)
+	req, err := http.NewRequest("DELETE", fmt.Sprintf("%s/api/relays/%d", c.url, id), nil)
 	if err != nil {
 		return fmt.Errorf("CancelRelay: http.NewRequest: %w", err)
 	}
@@ -127,7 +127,7 @@ func (c Client) CancelRelay(id int) error {
 
 	// Check the response status code
 	if resp.StatusCode != http.StatusAccepted {
-		return fmt.Errorf("CancelRelay: request error, status code=%d, body=%s", resp.StatusCode, body)
+		return fmt.Errorf("CancelRelay: response status code=%d, body=%s", resp.StatusCode, body)
 	}
 	return nil
 }

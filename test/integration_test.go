@@ -5,11 +5,13 @@ import (
 	"math/rand"
 	"testing"
 	"time"
+    "net/http"
+    "strings"
 
 	"relay/internal/client"
 	"relay/internal/models"
 	"relay/internal/server"
-	// "relay/internal/particle"
+	"relay/internal/particle"
 )
 
 type TestRelay struct {
@@ -17,40 +19,6 @@ type TestRelay struct {
 	DeviceId string
 	DRC      int
 	Status   models.RelayStatus
-}
-
-func assertRelay(
-	relay *models.Relay,
-	config server.Config,
-	deviceId string,
-	cloudFunction string,
-	argument string,
-	desiredReturnCode *int,
-	scheduledTime *time.Time,
-) error {
-	if relay.Device.DeviceId != deviceId {
-		return fmt.Errorf("assertRelay: deviceId, expected=%s, got=%s", deviceId, relay.Device.DeviceId)
-	}
-	if relay.CloudFunction != cloudFunction {
-		return fmt.Errorf("assertRelay: cloudFunction, expected=%s, got=%s", cloudFunction, relay.CloudFunction)
-	}
-	if relay.Argument != argument {
-		return fmt.Errorf("assertRelay: argument, expected=%s, got=%s", argument, relay.Argument)
-	}
-	if desiredReturnCode != nil {
-		if !relay.DesiredReturnCode.Valid {
-			return fmt.Errorf("assertRelay: desired return code: got invalid")
-		} else if int(relay.DesiredReturnCode.Int64) != *desiredReturnCode {
-			return fmt.Errorf("assertRelay: desired return code: expected=%d, got=%d", *desiredReturnCode, relay.DesiredReturnCode.Int64)
-		}
-	}
-	if scheduledTime != nil && relay.ScheduledTime != *scheduledTime {
-		return fmt.Errorf("assertRelay: scheduled time: expected=%s, got=%s", scheduledTime, relay.ScheduledTime)
-	}
-	if relay.Tries > config.MaxRetries {
-		return fmt.Errorf("assertRelay: tries=%d exceeds max tries=%d\n", relay.Tries, config.MaxRetries)
-	}
-	return nil
 }
 
 func generateRelay(nDevices int) (string, int, models.RelayStatus) {
@@ -75,17 +43,26 @@ func TestIntegration(t *testing.T) {
 		CFRetryDuration:   10 * time.Second,
 		MaxRetries:        3,
 	}
+
+	// db, err := SetupMemoryDB()
+	db, err := SetupFileDB("test.db3")
+	if err != nil {
+		t.Fatalf("TestCancellations: %+v", err)
+	}
+	// defer db.Close()
+
+    particle := particle.NewMock()
+	go server.BackgroundTask(config, db, particle)
 	go func() {
-		err := runTestServer(config)
-		if err != nil {
+	    if err := server.Run(db, "localhost", "8080"); err != nil {
 			// TODO: Fix this warning
-			t.Fatalf("TestIntegration: %+v", err)
-		}
+	        t.Fatalf("TestCancellations: Could not start server: %s\n", err)
+	    }
 	}()
 
-	time.Sleep(50 * time.Millisecond)
+	time.Sleep(100 * time.Millisecond)
 	client := client.NewClient(8080)
-	err := client.Ping()
+	err = client.Ping()
 	if err != nil {
 		t.Fatalf("TestIntegration: %+v", err)
 	}
@@ -93,8 +70,19 @@ func TestIntegration(t *testing.T) {
 	// Expect an error here for non existant relay
 	relay, err := client.GetRelay(1)
 	if err == nil {
-		t.Fatalf("TestIntegration: expected an error for non existant relay got %+v", relay)
+		t.Fatalf("TestIntegration: want an error for GetRelay non existant relay got=%+v", relay)
 	}
+    if !strings.Contains(err.Error(), fmt.Sprintf("status code=%d", http.StatusBadRequest)) {
+		t.Fatalf("TestIntegration: want %d for GetRelay on non existant relay got=%+v", http.StatusBadRequest, err)
+    }
+
+    err = client.CancelRelay(1)
+    if err == nil {
+		t.Fatalf("TestIntegration: want an error for CancelRelay on non existant relay got=%+v", relay)
+    }
+    if !strings.Contains(err.Error(), fmt.Sprintf("status code=%d", http.StatusUnprocessableEntity)) {
+		t.Fatalf("TestIntegration: want %d for CancelRelay on non existant relay got %+v", http.StatusUnprocessableEntity, err)
+    }
 
 	cloudFunction := "func0"
 	argument := ""
@@ -104,7 +92,7 @@ func TestIntegration(t *testing.T) {
 	nDevices := 20
 	testRelays := make([]TestRelay, nRelays)
 
-	// TODO: use goroutines to hit multiple requests as faster
+	// TODO: use goroutines to hit in parallel?
 	for i := 0; i < nRelays; i++ {
 		deviceId, drc, status := generateRelay(nDevices)
 		id, err := client.CreateRelay(deviceId, cloudFunction, argument, &drc, scheduledTime)
@@ -129,11 +117,14 @@ func TestIntegration(t *testing.T) {
 			} else if relay.Status != testRelays[i].Status {
 				t.Fatalf("TestIntegration: relay status mismatch, want=%d, got=%d, relay=%+v\n", int(testRelays[i].Status), int(relay.Status), relay)
 			} else {
-				err = assertRelay(relay, config, testRelays[i].DeviceId, cloudFunction, argument, &testRelays[i].DRC, scheduledTime)
+				err = AssertRelay(relay, testRelays[i].DeviceId, cloudFunction, argument, &testRelays[i].DRC, relay.Status, scheduledTime, relay.Tries)
 				if err != nil {
 					t.Fatalf("TestIntegration: %+v", err)
 				}
-				break
+                if relay.Tries > config.MaxRetries {
+                    t.Fatalf("TestIntegration: tries=%d exceeds max tries=%d\n", relay.Tries, config.MaxRetries)
+                }
+                break
 			}
 		}
 	}
