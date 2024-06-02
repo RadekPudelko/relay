@@ -26,7 +26,6 @@ Returns the id of a successfully created relay
 
 ```
 DELETE "/api/relays/{id}" - cancel a relay by id
-
 ```
 
 Requires a .env file in the format
