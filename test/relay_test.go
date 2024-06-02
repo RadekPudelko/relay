@@ -1,7 +1,6 @@
 package test
 
 import (
-	"database/sql"
 	"testing"
 	"time"
 
@@ -19,7 +18,7 @@ func TestCreateRelay(t *testing.T) {
 	relayId := "devid0"
 	cloudFunction := "func1"
 	argument := ""
-	desiredReturnCode := sql.NullInt64{Int64: 0, Valid: false}
+	var desiredReturnCode *int = nil
 	scheduledTime0 := time.Now().UTC()
 
 	tid, err := AssertCreateRelay(db, relayId, cloudFunction, argument, desiredReturnCode, scheduledTime0)
@@ -39,7 +38,8 @@ func TestCreateRelay(t *testing.T) {
 		t.Fatalf("TestCreateRelays: expected to create relay id 2, got %d", tid)
 	}
 
-	desiredReturnCode = sql.NullInt64{Int64: 0, Valid: true}
+    code := 0
+	desiredReturnCode = &code
 	tid, err = AssertCreateRelay(db, relayId, cloudFunction, argument, desiredReturnCode, scheduledTime0)
 	if err != nil {
 		t.Fatalf("TestCreateRelays: %+v", err)
@@ -60,7 +60,7 @@ func TestGetReadyRelays(t *testing.T) {
 	relayId := "dev0"
 	cloudFunction := "func0"
 	argument := ""
-	desiredReturnCode := sql.NullInt64{Int64: 0, Valid: false}
+	var desiredReturnCode *int = nil
 
 	testTimeStr := "2024-05-15 20:17:32.897647+00:00" // 1 day after scheduled relays
 	testTime, err := time.Parse(layout, testTimeStr)

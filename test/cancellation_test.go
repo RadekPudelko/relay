@@ -1,7 +1,6 @@
 package test
 
 import (
-	"database/sql"
 	"relay/internal/models"
 	"relay/internal/server"
 	"testing"
@@ -21,7 +20,7 @@ func TestCancellations(t *testing.T) {
 		t.Fatalf("TestCancellations: expected InsertCancellation on nonexistant relay to fail, created id=%d\n", id)
 	}
 
-	relayId, err := AssertCreateRelay(db, "dev0", "", "", sql.NullInt64{Int64: 0, Valid: false}, time.Now().UTC())
+	relayId, err := AssertCreateRelay(db, "dev0", "", "", nil, time.Now().UTC())
 	if err != nil {
 		t.Fatalf("TestCancellations: %+v", err)
 	}
@@ -50,5 +49,4 @@ func TestCancellations(t *testing.T) {
 	if len(cancellations) != 0 {
 		t.Fatalf("TestCancellations: there should be no cancellations left, found %+v", cancellations)
 	}
-
 }

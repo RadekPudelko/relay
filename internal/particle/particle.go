@@ -1,7 +1,6 @@
 package particle
 
 import (
-	"database/sql"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -11,7 +10,7 @@ import (
 
 type ParticleAPI interface {
 	Ping(deviceId string) (bool, error)
-	CloudFunction(deviceId string, cloudFunction string, argument string, returnValue sql.NullInt64) (bool, error)
+	CloudFunction(deviceId string, cloudFunction string, argument string, returnValue *int) (bool, error)
 }
 
 type Particle struct {
@@ -76,7 +75,7 @@ func (p Particle) Ping(deviceId string) (bool, error) {
 	return response.Online, nil
 }
 
-func (p Particle) CloudFunction(deviceId string, cloudFunction string, argument string, returnValue sql.NullInt64) (bool, error) {
+func (p Particle) CloudFunction(deviceId string, cloudFunction string, argument string, returnValue *int) (bool, error) {
 	params := url.Values{}
 	params.Add("access_token", p.token)
 	params.Add("arg", argument)
@@ -113,9 +112,6 @@ func (p Particle) CloudFunction(deviceId string, cloudFunction string, argument 
 		return false, fmt.Errorf("particle.Ping: json.Unmarshal: %w, body %s", err, body)
 	}
 
-	if returnValue.Valid {
-		return data.ReturnValue == int(returnValue.Int64), nil
-	}
 	return true, nil
 }
 

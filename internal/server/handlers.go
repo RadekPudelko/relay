@@ -208,12 +208,7 @@ func handleCreateRelay(dbConn *sql.DB, w http.ResponseWriter, r *http.Request) {
 		argument = *req.Argument
 	}
 
-	desiredReturnCode := sql.NullInt64{Int64: 0, Valid: false}
-	if req.DesiredReturnCode != nil {
-		desiredReturnCode = sql.NullInt64{Int64: int64(*req.DesiredReturnCode), Valid: true}
-	}
-
-	relayId, err := CreateRelay(dbConn, req.DeviceId, req.CloudFunction, argument, desiredReturnCode, scheduledTime)
+	relayId, err := CreateRelay(dbConn, req.DeviceId, req.CloudFunction, argument, req.DesiredReturnCode, scheduledTime)
 	if err != nil {
 		log.Println("handleCreateRelay:", err.Error())
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -228,7 +223,7 @@ func handleCreateRelay(dbConn *sql.DB, w http.ResponseWriter, r *http.Request) {
 	io.WriteString(w, fmt.Sprintf("%d", relayId))
 }
 
-func CreateRelay(dbConn *sql.DB, deviceId string, cloudFunction string, argument string, desiredReturnCode sql.NullInt64, scheduledTime time.Time) (int, error) {
+func CreateRelay(dbConn *sql.DB, deviceId string, cloudFunction string, argument string, desiredReturnCode *int, scheduledTime time.Time) (int, error) {
 	deviceKey, err := models.InsertOrUpdateDevice(dbConn, deviceId)
 	if err != nil {
 		return 0, fmt.Errorf("CreateRelay: %w", err)

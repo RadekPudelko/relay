@@ -1,7 +1,6 @@
 package particle
 
 import (
-	"database/sql"
 	"fmt"
 )
 
@@ -37,13 +36,13 @@ func (p MockParticle) Ping(deviceId string) (bool, error) {
 }
 
 // Return is decided by the value returnValue
-func (p MockParticle) CloudFunction(deviceId string, cloudFunction string, argument string, returnValue sql.NullInt64) (bool, error) {
-	if !returnValue.Valid {
+func (p MockParticle) CloudFunction(deviceId string, cloudFunction string, argument string, returnValue *int) (bool, error) {
+    if returnValue == nil {
 		return true, nil
-	}
+    }
 	// TODO: add latency
 	// TODO: make this random instead
-	switch returnValue.Int64 {
+	switch *returnValue {
 	case DeviceCFError:
 		return false, fmt.Errorf("MockParticle.CloudFunction: error")
 	case DeviceCFBadRV:

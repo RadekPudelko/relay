@@ -41,7 +41,7 @@ func AssertCreateRelay(db *sql.DB,
 	deviceId string,
 	cloudFunction string,
 	argument string,
-	desiredReturnCode sql.NullInt64,
+	desiredReturnCode *int,
 	scheduledTime time.Time,
 ) (int, error) {
 	id, err := server.CreateRelay(db, deviceId, cloudFunction, argument, desiredReturnCode, scheduledTime)
@@ -53,12 +53,7 @@ func AssertCreateRelay(db *sql.DB,
 	if err != nil {
 		return 0, fmt.Errorf("AssertCreateRelay: %w", err)
 	}
-    var drc *int = nil
-    if desiredReturnCode.Valid {
-        drcVal := int(desiredReturnCode.Int64)
-        drc = &drcVal
-    }
-    err = AssertRelay(relay, deviceId, cloudFunction, argument, drc, models.RelayReady, &scheduledTime, 0)
+    err = AssertRelay(relay, deviceId, cloudFunction, argument, desiredReturnCode, models.RelayReady, &scheduledTime, 0)
     if err != nil {
         return 0, fmt.Errorf("AssertCreateRelay: %w", err)
     }
@@ -85,10 +80,10 @@ func AssertRelay(
 		return fmt.Errorf("AssertRelay: argument, want=%s, got=%s", argument, relay.Argument)
 	}
 	if desiredReturnCode != nil {
-		if !relay.DesiredReturnCode.Valid {
-			return fmt.Errorf("AssertRelay: desired return code: got invalid")
-		} else if int(relay.DesiredReturnCode.Int64) != *desiredReturnCode {
-			return fmt.Errorf("AssertRelay: desired return code: want=%d, got=%d", *desiredReturnCode, relay.DesiredReturnCode.Int64)
+        if relay.DesiredReturnCode == nil {
+			return fmt.Errorf("AssertRelay: desired return code: got nil")
+        } else if *relay.DesiredReturnCode != *desiredReturnCode {
+			return fmt.Errorf("AssertRelay: desired return code: want=%d, got=%d", *desiredReturnCode, *relay.DesiredReturnCode)
 		}
 	}
 	if relay.Status != status {
@@ -116,17 +111,12 @@ func AssertUpdateRelay(db *sql.DB, relayId int, deviceId string, cloudFunction s
 	return nil
 }
 
-func AssertCreateAndUpdateRelay(db *sql.DB, deviceId string, cloudFunction, argument string, desiredReturnCode sql.NullInt64, scheduledTime time.Time, status models.RelayStatus, tries int) (int, error) {
+func AssertCreateAndUpdateRelay(db *sql.DB, deviceId string, cloudFunction, argument string, desiredReturnCode *int, scheduledTime time.Time, status models.RelayStatus, tries int) (int, error) {
 	relayId, err := AssertCreateRelay(db, deviceId, cloudFunction, argument, desiredReturnCode, scheduledTime)
 	if err != nil {
 		return 0, fmt.Errorf("AssertCreateAndUpdateRelay: %w", err)
 	}
-    var drc *int = nil
-    if desiredReturnCode.Valid {
-        drcVal := int(desiredReturnCode.Int64)
-        drc = &drcVal
-    }
-	err = AssertUpdateRelay(db, relayId, deviceId, cloudFunction, argument, drc, scheduledTime, status, tries)
+	err = AssertUpdateRelay(db, relayId, deviceId, cloudFunction, argument, desiredReturnCode, scheduledTime, status, tries)
 	if err != nil {
 		return 0, fmt.Errorf("AssertCreateAndUpdateRelay: %w", err)
 	}

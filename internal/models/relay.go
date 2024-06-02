@@ -12,7 +12,7 @@ type Relay struct {
 	Device            *Device       `json:"device"`
 	CloudFunction     string        `json:"cloud_function"`
 	Argument          string        `json:"argument"`
-	DesiredReturnCode sql.NullInt64 `json:"desired_return_code"`
+	DesiredReturnCode *int `json:"desired_return_code"`
 	ScheduledTime     time.Time     `json:"scheduled_time"`
 	Status            RelayStatus   `json:"status"`
 	Tries             int           `json:"tries"`
@@ -22,20 +22,6 @@ func (t Relay) String() string {
 	return fmt.Sprintf("relay id: %d, device: %s, function:%s, argument %s", t.Id, t.Device.DeviceId, t.CloudFunction, t.Argument)
 }
 
-// func NewTask(id int, device *Device, cloudFunction, argument string, desiredReturnCode sql.NullInt64, scheduledTime time.Time, status RelayStatus, tries int) Contact {
-//     return Relay {
-//         Id: id,
-//         Device
-//
-//
-//     }
-// 	return Contact{
-// 		Id:    id,
-// 		Name:  name,
-// 		Email: email,
-// 	}
-// }
-
 type RelayStatus int
 
 const (
@@ -44,31 +30,6 @@ const (
 	RelayComplete  RelayStatus = 2
 	RelayCancelled RelayStatus = 3
 )
-
-// Example of custom field serialization so that instead of reporting sql.NullFields
-// as   "response_text": {
-//   "String": "",
-//   "Valid": false
-// }
-// they appear as "response_text": null
-
-// type Person struct {
-// 	ID           int          `json:"id"`
-// 	Name         string       `json:"name"`
-// 	Age          int          `json:"age"`
-// 	ResponseText NullStringExt `json:"response_text"`
-// }
-//
-// type NullStringExt struct {
-// 	sql.NullString
-// }
-//
-// func (n NullStringExt) MarshalJSON() ([]byte, error) {
-// 	if !n.Valid {
-// 		return []byte("null"), nil
-// 	}
-// 	return json.Marshal(n.String)
-// }
 
 func SelectRelay(db *sql.DB, id int) (*Relay, error) {
 	const query string = `SELECT * FROM relays WHERE id = ?`
@@ -170,7 +131,7 @@ func SelectRelayIds(db *sql.DB, status RelayStatus, startId, endId, limit *int, 
 	return relayIds, nil
 }
 
-func InsertRelay(db *sql.DB, deviceKey int, cloudFunction string, argument string, desiredReturnCode sql.NullInt64, scheduledTime time.Time) (int, error) {
+func InsertRelay(db *sql.DB, deviceKey int, cloudFunction string, argument string, desiredReturnCode *int, scheduledTime time.Time) (int, error) {
 	const query string = `
         INSERT INTO relays
         (device_key, cloud_function, argument, desired_return_code, scheduled_time, status, tries)
