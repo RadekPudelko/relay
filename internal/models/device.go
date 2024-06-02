@@ -9,7 +9,6 @@ type Device struct {
 	Id         int          `json:"id"`
 	DeviceId   string       `json:"device_id"`
 	LastOnline sql.NullTime `json:"last_online"`
-	LastPing   sql.NullTime `json:"last_ping"`
 }
 
 func SelectDevice(db *sql.DB, key int) (*Device, error) {
@@ -22,12 +21,12 @@ func SelectDevice(db *sql.DB, key int) (*Device, error) {
 
 	row := stmt.QueryRow(key)
 	var device Device
-	err = row.Scan(&device.Id, &device.DeviceId, &device.LastOnline, &device.LastPing)
+	err = row.Scan(&device.Id, &device.DeviceId, &device.LastOnline)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return nil, nil
 		}
-		return nil, fmt.Errorf("SelectRelay: row.Scan: %w", err)
+		return nil, fmt.Errorf("SelectDevice: row.Scan: %w", err)
 	}
 	return &device, nil
 }
@@ -41,7 +40,7 @@ func SelectDeviceByDeviceId(db *sql.DB, deviceId string) (*Device, error) {
 	defer stmt.Close()
 
 	var device Device
-	err = stmt.QueryRow(deviceId).Scan(&device.Id, &device.DeviceId, &device.LastOnline, &device.LastPing)
+	err = stmt.QueryRow(deviceId).Scan(&device.Id, &device.DeviceId, &device.LastOnline)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return nil, nil
@@ -52,10 +51,10 @@ func SelectDeviceByDeviceId(db *sql.DB, deviceId string) (*Device, error) {
 	return &device, nil
 }
 
-func UpdateDevice(db *sql.DB, id int, onlineTime, pingTime sql.NullTime) error {
+func UpdateDevice(db *sql.DB, id int, onlineTime sql.NullTime) error {
 	const query string = `
         UPDATE devices
-        SET last_online = ?, last_ping = ?
+        SET last_online = ?
         WHERE id = ?
     `
 	stmt, err := db.Prepare(query)
@@ -64,7 +63,7 @@ func UpdateDevice(db *sql.DB, id int, onlineTime, pingTime sql.NullTime) error {
 	}
 	defer stmt.Close()
 
-	result, err := stmt.Exec(onlineTime, pingTime, id)
+	result, err := stmt.Exec(onlineTime, id)
 	if err != nil {
 		return fmt.Errorf("UpdateDevice: stmt.Exec: %w", err)
 	}
@@ -79,14 +78,14 @@ func UpdateDevice(db *sql.DB, id int, onlineTime, pingTime sql.NullTime) error {
 }
 
 func InsertDevice(db *sql.DB, deviceId string) (int, error) {
-	const query string = `INSERT INTO devices (device_id, last_online, last_ping) VALUES (?, ?, ?)`
+	const query string = `INSERT INTO devices (device_id, last_online) VALUES (?, ?)`
 	stmt, err := db.Prepare(query)
 	if err != nil {
 		return 0, fmt.Errorf("InsertDevice: db.Prepare: %w", err)
 	}
 	defer stmt.Close()
 
-	result, err := stmt.Exec(deviceId, nil, nil)
+	result, err := stmt.Exec(deviceId, nil)
 	if err != nil {
 		return 0, fmt.Errorf("InsertDevice: stmt.Exec: %w", err)
 	}

@@ -28,8 +28,7 @@ func CreateDevicesTable(db *sql.DB) error {
          CREATE TABLE IF NOT EXISTS devices (
          id INTEGER PRIMARY KEY AUTOINCREMENT,
          device_id TEXT UNIQUE NOT NULL,
-         last_online DATETIME NULL,
-         last_ping DATETIME NULL
+         last_online DATETIME NULL
          )`
 	_, err := db.Exec(query)
 	if err != nil {
