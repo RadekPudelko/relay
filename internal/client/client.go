@@ -9,8 +9,8 @@ import (
 	"strconv"
 	"time"
 
-	"relay/internal/models"
-	"relay/internal/server"
+	"github.com/RadekPudelko/relay/internal/models"
+	"github.com/RadekPudelko/relay/internal/server"
 )
 
 type Client struct {

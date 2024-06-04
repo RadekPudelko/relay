@@ -1,4 +1,4 @@
-module relay
+module github.com/RadekPudelko/relay
 
 go 1.22.0
 

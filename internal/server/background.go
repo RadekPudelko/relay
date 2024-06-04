@@ -7,9 +7,9 @@ import (
 	"sync"
 	"time"
 
-	"relay/internal/models"
-	"relay/internal/particle"
-	"relay/internal/config"
+	"github.com/RadekPudelko/relay/internal/models"
+	"github.com/RadekPudelko/relay/internal/particle"
+	"github.com/RadekPudelko/relay/internal/config"
 )
 
 // TODO: make backgroundTask sleep when there are no relays, wake by new relay post?

@@ -6,10 +6,10 @@ import (
 	"os"
 
 	"github.com/joho/godotenv"
-	"relay/internal/database"
-	"relay/internal/particle"
-	"relay/internal/server"
-	"relay/internal/config"
+	"github.com/RadekPudelko/relay/internal/database"
+	"github.com/RadekPudelko/relay/internal/particle"
+	"github.com/RadekPudelko/relay/internal/server"
+	"github.com/RadekPudelko/relay/internal/config"
 
     "github.com/pelletier/go-toml"
 )

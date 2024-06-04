@@ -7,7 +7,7 @@ import (
 	"net/http"
 	"os"
 
-	"relay/internal/middleware"
+	"github.com/RadekPudelko/relay/internal/middleware"
 )
 
 func NewServer(db *sql.DB) http.Handler {

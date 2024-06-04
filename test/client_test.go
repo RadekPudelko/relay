@@ -7,11 +7,11 @@ import (
 	"testing"
 	"time"
 
-	"relay/internal/client"
-	"relay/internal/config"
-	"relay/internal/models"
-	"relay/internal/particle"
-	"relay/internal/server"
+	"github.com/RadekPudelko/relay/internal/client"
+	"github.com/RadekPudelko/relay/internal/config"
+	"github.com/RadekPudelko/relay/internal/models"
+	"github.com/RadekPudelko/relay/internal/particle"
+	"github.com/RadekPudelko/relay/internal/server"
 )
 
 func TestClient(t *testing.T) {

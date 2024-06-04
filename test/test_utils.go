@@ -6,9 +6,9 @@ import (
 	"os"
 	"time"
 
-	"relay/internal/database"
-	"relay/internal/models"
-	"relay/internal/server"
+	"github.com/RadekPudelko/relay/internal/database"
+	"github.com/RadekPudelko/relay/internal/models"
+	"github.com/RadekPudelko/relay/internal/server"
 )
 
 const layout = "2006-01-02 15:04:05.999999-07:00"

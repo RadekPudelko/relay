@@ -4,7 +4,7 @@ import (
 	"testing"
     "os"
 
-	"relay/internal/config"
+	"github.com/RadekPudelko/relay/internal/config"
 )
 
 func TestConfig(t *testing.T) {
