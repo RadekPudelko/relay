@@ -6,7 +6,7 @@ import (
 
 	"github.com/joho/godotenv"
 
-	"github.com/RadekPudelko/relay/internal/client"
+	"github.com/RadekPudelko/relay/pkg/client"
 )
 
 func main() {

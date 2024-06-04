@@ -9,8 +9,7 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/RadekPudelko/relay/internal/models"
-	"github.com/RadekPudelko/relay/internal/server"
+	"github.com/RadekPudelko/relay/pkg/models"
 )
 
 type Client struct {
@@ -61,7 +60,7 @@ func (c Client) GetRelay(id int) (*models.Relay, error) {
 }
 
 func (c Client) CreateRelay(deviceId string, cloudFunction string, argument string, desiredReturnCode *int, scheduledTime *time.Time) (int, error) {
-	data := server.CreateRelayRequest{
+	data := models.CreateRelayRequest{
 		DeviceId:          deviceId,
 		CloudFunction:     cloudFunction,
 		Argument:          &argument,
