@@ -7,7 +7,7 @@ client:
 int:
 	go test test/integration_test.go test/test_utils.go -v | tee int.txt
 
-unit: relay cancellation client_test
+unit: relay cancellation client_test config
 
 relay:
 	go test test/relay_test.go test/test_utils.go -v
@@ -17,6 +17,9 @@ cancellation:
 
 client_test:
 	go test test/client_test.go test/test_utils.go -v
+
+config:
+	go test test/config_test.go -v
 
 fmt:
 	gofmt -s -w .

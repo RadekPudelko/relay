@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"relay/internal/client"
+	"relay/internal/config"
 	"relay/internal/models"
 	"relay/internal/particle"
 	"relay/internal/server"
@@ -15,15 +16,9 @@ import (
 
 func TestClient(t *testing.T) {
 	t.Log("TestClient")
-	config := server.Config{
-		Host:              "localhost",
-		Port:              "8080",
-		MaxRoutines:       3,
-		RelayLimit:        10,
-		PingRetryDuration: 15 * time.Second,
-		CFRetryDuration:   10 * time.Second,
-		MaxRetries:        3,
-	}
+    myConfig := config.GetDefaultConfig()
+    myConfig.Settings.PingRetrySeconds = 15
+    myConfig.Settings.CFRetrySeconds = 10
 
 	// db, err := SetupMemoryDB()
 	db, err := SetupFileDB("test.db3")
@@ -89,7 +84,7 @@ func TestClient(t *testing.T) {
 		t.Fatalf("TestClient: %+v", err)
 	}
 
-	go server.BackgroundTask(config, db, particle)
+	go server.BackgroundTask(&myConfig, db, particle)
 	time.Sleep(100 * time.Millisecond)
 
 	relay, err = client.GetRelay(id)

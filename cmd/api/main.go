@@ -4,12 +4,14 @@ import (
 	"fmt"
 	"log"
 	"os"
-	"time"
 
 	"github.com/joho/godotenv"
 	"relay/internal/database"
 	"relay/internal/particle"
 	"relay/internal/server"
+	"relay/internal/config"
+
+    "github.com/pelletier/go-toml"
 )
 
 func main() {
@@ -21,26 +23,28 @@ func main() {
 }
 
 func run() error {
-	// config := server.Config{
-	// 	Host:              "localhost",
-	// 	Port:              "8080",
-	// 	MaxRoutines:       3,
-	// 	RelayLimit:        10,
-	// 	PingRetryDuration: 600 * time.Second,
-	// 	CFRetryDuration:   600 * time.Second,
-	// 	MaxRetries:        3,
-	// }
-	config := server.Config{
-		Host:              "localhost",
-		Port:              "8080",
-		MaxRoutines:       4,
-		RelayLimit:        100,
-		PingRetryDuration: 60 * time.Second,
-		CFRetryDuration:   60 * time.Second,
-		MaxRetries:        3,
-	}
+    var err error
+    defaultConfig := config.GetDefaultConfig()
 
-	err := godotenv.Load(".env")
+    var myConfig *config.Config
+	if _, err := os.Stat("config.toml"); err == nil {
+        myConfig, err = config.LoadConfig("config.toml", &defaultConfig)
+        log.Printf("run: loading config from config.toml")
+        if err != nil {
+            log.Fatalf("run: %+v", err)
+        }
+    } else {
+        log.Printf("run: loading default config")
+        myConfig = &defaultConfig
+    }
+
+    tomlData, err := toml.Marshal(myConfig)
+    if err != nil {
+        log.Fatalf("run: toml.Marshal: %v", err)
+    }
+    log.Printf("run: config=%s\n", string(tomlData))
+
+	err = godotenv.Load(".env")
 	if err != nil {
 		log.Fatalf("run: Error loading .env file: %v", err)
 	}
@@ -54,17 +58,13 @@ func run() error {
 		log.Fatalf("run: %+v", err)
 	}
 
-	dbPath := os.Getenv("DB")
-	if particleToken == "" {
-		log.Fatalf("run: missing PARTICLE_TOKEN in .env file")
-	}
-	dbConn, err := database.Setup(dbPath, true)
+	dbConn, err := database.Setup(myConfig.Database.Filename, true)
 	if err != nil {
 		log.Fatal("run: %w", err)
 	}
 	defer dbConn.Close()
 
-	go server.BackgroundTask(config, dbConn, particle)
-	err = server.Run(dbConn, config.Host, config.Port)
+	go server.BackgroundTask(myConfig, dbConn, particle)
+	err = server.Run(dbConn, myConfig.Server.Host, fmt.Sprintf("%d",myConfig.Server.Port))
 	return nil
 }

@@ -9,12 +9,13 @@ import (
 
 	"relay/internal/models"
 	"relay/internal/particle"
+	"relay/internal/config"
 )
 
 // TODO: make backgroundTask sleep when there are no relays, wake by new relay post?
 // TODO: reduce logs
-func BackgroundTask(config Config, dbConn *sql.DB, particle particle.ParticleAPI) {
-	var sem = make(chan int, config.MaxRoutines)
+func BackgroundTask(config *config.Config, dbConn *sql.DB, particle particle.ParticleAPI) {
+	var sem = make(chan int, config.Settings.MaxRoutines)
 	lastRelayId := 0
 	lastNRelays := -1
 	for true {
@@ -27,7 +28,7 @@ func BackgroundTask(config Config, dbConn *sql.DB, particle particle.ParticleAPI
 		// Get ready relays, starting from the lastRelayId, limited 1 per device
 		// This implementation does not care about the order of relays
 		// To take into account order, would first need to get list of devices with ready relays, then query the min for each
-		relayIds, err := GetReadyRelays(dbConn, lastRelayId, config.RelayLimit, time.Now().UTC())
+		relayIds, err := GetReadyRelays(dbConn, lastRelayId, config.Settings.RelayLimit, time.Now().UTC())
 		if err != nil {
 			// Fatal?
 			log.Fatal("backgroundTask: ", err)
@@ -85,7 +86,7 @@ func ProcessCancellations(dbConn *sql.DB) error {
 }
 
 // TODO: Update the schedule time of the relay if its been recently pinged and offline, ping fails or device is offile
-func processRelay(config Config, dbConn *sql.DB, particle particle.ParticleAPI, id int) {
+func processRelay(config *config.Config, dbConn *sql.DB, particle particle.ParticleAPI, id int) {
 	relay, err := models.SelectRelay(dbConn, id)
 	if err != nil {
 		log.Printf("processRelay: id=%d, %+v\n", id, err)
@@ -104,7 +105,7 @@ func processRelay(config Config, dbConn *sql.DB, particle particle.ParticleAPI, 
 			} else {
 				log.Printf("processRelay: id=%d, device %s is offline\n", id, relay.Device.DeviceId)
 			}
-			later := time.Now().Add(config.PingRetryDuration).UTC()
+			later := time.Now().Add(time.Duration(config.Settings.PingRetrySeconds) * time.Second).UTC()
 			err = models.UpdateRelay(dbConn, id, later, relay.Status, relay.Tries)
 			if err != nil {
 				// TODO: This and many places like this should never fail, so should the server crash here??
@@ -124,10 +125,10 @@ func processRelay(config Config, dbConn *sql.DB, particle particle.ParticleAPI, 
 	// TODO: may want to get return value from function
 	// TODO: may want to add some way to store error history in the database
 	success, err := particle.CloudFunction(relay.Device.DeviceId, relay.CloudFunction, relay.Argument, relay.DesiredReturnCode)
-	later := time.Now().Add(config.CFRetryDuration).UTC()
+	later := time.Now().Add(time.Duration(config.Settings.CFRetrySeconds) * time.Second).UTC()
 	if err != nil {
 		log.Printf("processRelay: id=%d, tries=%d, %+v", id, relay.Tries, err)
-		if relay.Tries >= config.MaxRetries-1 { // start from 0
+		if relay.Tries >= config.Settings.MaxRetries-1 { // start from 0
 			log.Printf("processRelay: id=%d has failed due to max failed tries\n", id)
 			err = models.UpdateRelay(dbConn, id, relay.ScheduledTime, models.RelayFailed, relay.Tries+1)
 		} else {
