@@ -7,7 +7,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/RadekPudelko/relay/internal/models"
+	"github.com/RadekPudelko/relay/pkg/models"
 	"github.com/RadekPudelko/relay/internal/particle"
 	"github.com/RadekPudelko/relay/internal/config"
 )

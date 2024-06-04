@@ -1,7 +1,7 @@
 package test
 
 import (
-	"github.com/RadekPudelko/relay/internal/models"
+	"github.com/RadekPudelko/relay/pkg/models"
 	"github.com/RadekPudelko/relay/internal/server"
 	"testing"
 	"time"

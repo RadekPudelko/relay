@@ -7,9 +7,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/RadekPudelko/relay/internal/client"
+	"github.com/RadekPudelko/relay/pkg/client"
 	"github.com/RadekPudelko/relay/internal/config"
-	"github.com/RadekPudelko/relay/internal/models"
+	"github.com/RadekPudelko/relay/pkg/models"
 	"github.com/RadekPudelko/relay/internal/particle"
 	"github.com/RadekPudelko/relay/internal/server"
 )

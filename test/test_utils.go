@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/RadekPudelko/relay/internal/database"
-	"github.com/RadekPudelko/relay/internal/models"
+	"github.com/RadekPudelko/relay/pkg/models"
 	"github.com/RadekPudelko/relay/internal/server"
 )
 
