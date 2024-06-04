@@ -10,6 +10,7 @@ import (
 	"relay/internal/models"
 	"relay/internal/particle"
 	"relay/internal/server"
+	"relay/internal/config"
 )
 
 type TestRelay struct {
@@ -33,15 +34,10 @@ func generateRelay(nDevices int) (string, int, models.RelayStatus) {
 
 func TestIntegration(t *testing.T) {
 	t.Log("TestIntegration")
-	config := server.Config{
-		Host:              "localhost",
-		Port:              "8080",
-		MaxRoutines:       3,
-		RelayLimit:        10,
-		PingRetryDuration: 15 * time.Second,
-		CFRetryDuration:   10 * time.Second,
-		MaxRetries:        3,
-	}
+
+    myConfig := config.GetDefaultConfig()
+    myConfig.Settings.PingRetrySeconds = 15
+    myConfig.Settings.CFRetrySeconds = 10
 
 	// db, err := SetupMemoryDB()
 	db, err := SetupFileDB("test.db3")
@@ -51,7 +47,7 @@ func TestIntegration(t *testing.T) {
 	// defer db.Close()
 
 	particle := particle.NewMock()
-	go server.BackgroundTask(config, db, particle)
+	go server.BackgroundTask(&myConfig, db, particle)
 	go func() {
 		if err := server.Run(db, "localhost", "8080"); err != nil {
 			// TODO: Fix this warning
@@ -110,8 +106,8 @@ func TestIntegration(t *testing.T) {
 				if err != nil {
 					t.Fatalf("TestIntegration: %+v", err)
 				}
-				if relay.Tries > config.MaxRetries {
-					t.Fatalf("TestIntegration: tries=%d exceeds max tries=%d\n", relay.Tries, config.MaxRetries)
+				if relay.Tries > myConfig.Settings.MaxRetries {
+					t.Fatalf("TestIntegration: tries=%d exceeds max tries=%d\n", relay.Tries, myConfig.Settings.MaxRetries)
 				}
 				break
 			} else {

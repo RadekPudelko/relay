@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	"relay/internal/models"
+	"github.com/RadekPudelko/relay/internal/models"
 )
 
 func TestCreateRelay(t *testing.T) {

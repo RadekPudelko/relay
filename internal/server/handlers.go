@@ -10,7 +10,7 @@ import (
 	"strconv"
 	"time"
 
-	"relay/internal/models"
+	"github.com/RadekPudelko/relay/internal/models"
 )
 
 // TODO: Rename this to something w/o verb

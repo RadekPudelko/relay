@@ -1,8 +1,8 @@
 package test
 
 import (
-	"relay/internal/models"
-	"relay/internal/server"
+	"github.com/RadekPudelko/relay/internal/models"
+	"github.com/RadekPudelko/relay/internal/server"
 	"testing"
 	"time"
 )
